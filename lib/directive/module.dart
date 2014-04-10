@@ -10,6 +10,7 @@ library angular.directive;
 
 import 'package:di/di.dart';
 import 'dart:html' as dom;
+import 'dart:async' as async;
 import 'package:intl/intl.dart';
 import 'package:angular/core/annotation.dart';
 import 'package:angular/core/module_internal.dart';
@@ -46,7 +47,7 @@ part 'ng_model_validators.dart';
 class NgDirectiveModule extends Module {
   NgDirectiveModule() {
     value(NgA, null);
-    type(NgBaseCss);  // The root injector should have an empty NgBaseCss
+    type(NgBaseCss, implementedBy: RootNgBaseCss);  // The root injector should have an empty NgBaseCss
     value(NgBind, null);
     value(NgBindTemplate, null);
     value(NgBindHtml, null);

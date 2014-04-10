@@ -178,16 +178,14 @@ class _ComponentFactory implements Function {
     // styles all over the page. We shouldn't be doing browsers work,
     // so change back to using @import once Chrome bug is fixed or a
     // better work around is found.
-    List<async.Future<String>> cssFutures = new List();
-    var cssUrls = []..addAll(_baseCss.urls)..addAll(component.cssUrls);
-    if (cssUrls.isNotEmpty) {
-      cssUrls.forEach((css) => cssFutures.add(http
+    async.Future<String> cssFuture = _baseCss.urls.then((baseCssUrls) {
+      var cssUrls = []..addAll(baseCssUrls)..addAll(component.cssUrls);
+      if (cssUrls.isEmpty) return null;
+      return async.Future.wait(cssUrls.map((css) => http
           .getString(css, cache: templateCache)
           .catchError((e) => '/*\n$e\n*/\n')
       ));
-    } else {
-      cssFutures.add(new async.Future.value(null));
-    }
+    });
     var viewFuture;
     if (component.template != null) {
       viewFuture = new async.Future.value(viewCache.fromHtml(
@@ -196,7 +194,7 @@ class _ComponentFactory implements Function {
       viewFuture = viewCache.fromUrl(component.templateUrl, directives);
     }
     TemplateLoader templateLoader = new TemplateLoader(
-        async.Future.wait(cssFutures).then((Iterable<String> cssList) {
+        cssFuture.then((Iterable<String> cssList) {
           if (cssList != null) {
             shadowDom.setInnerHtml(
               cssList
