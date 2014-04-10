@@ -206,7 +206,6 @@ _createTimer(Function fn, Duration duration, bool periodic) {
 sync(Function fn) => new FunctionComposition(_syncOuter, fn);
 
 _syncOuter(Function fn) => () {
-  _asyncErrors.clear();
 
   dart_async.runZoned(fn, zoneSpecification: new dart_async.ZoneSpecification(
     scheduleMicrotask: (_, __, ___, asyncFn) {
@@ -218,13 +217,8 @@ _syncOuter(Function fn) => () {
     createPeriodicTimer:
         (_, __, ___, Duration period, void f(dart_async.Timer timer)) {
             throw ['periodic Timer created from sync function.'];
-        },
-    handleUncaughtError: (_, __, ___, e, s) => _asyncErrors.add([e, s])
+        }
     ));
-
-  _asyncErrors.forEach((e) {
-    throw "During runZoned: ${e[0]}.  Stack:\n${e[1]}";
-  });
 };
 
 class _TimerSpec implements dart_async.Timer {
