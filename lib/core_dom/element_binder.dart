@@ -83,7 +83,7 @@ class ElementBinder {
   bool get hasDirectivesOrEvents =>
       _usableDirectiveRefs.isNotEmpty || onEvents.isNotEmpty;
 
-  _bindTwoWay(tasks, expression, scope, dstPathFn, controller, formatters, dstExpression) {
+  void _bindTwoWay(tasks, expression, scope, dstPathFn, controller, formatters, dstExpression) {
     var taskId = tasks.registerTask();
     Expression expressionFn = _parser(expression);
 
@@ -120,11 +120,13 @@ class ElementBinder {
     }, formatters: formatters);
   }
 
-  _bindCallback(dstPathFn, controller, expression, scope) {
+  void _bindCallback(dstPathFn, controller, expression, scope) {
     dstPathFn.assign(controller, _parser(expression).bind(scope.context, ScopeLocals.wrapper));
   }
 
-  _createAttrMappings(controller, scope, List<MappingParts> mappings, nodeAttrs, formatters, tasks) {
+
+  void _createAttrMappings(directive, scope, List<MappingParts> mappings, nodeAttrs, formatters,
+                           tasks) {
     mappings.forEach((MappingParts p) {
       var attrName = p.attrName;
       var dstExpression = p.dstExpression;
@@ -140,11 +142,11 @@ class ElementBinder {
       if (bindAttr != null) {
         if (p.mode == '<=>') {
           _bindTwoWay(tasks, bindAttr, scope, dstPathFn,
-              controller, formatters, dstExpression);
+              directive, formatters, dstExpression);
         } else if(p.mode == '&') {
-          _bindCallback(dstPathFn, controller, bindAttr, scope);
+          _bindCallback(dstPathFn, directive, bindAttr, scope);
         } else {
-          _bindOneWay(tasks, bindAttr, scope, dstPathFn, controller, formatters);
+          _bindOneWay(tasks, bindAttr, scope, dstPathFn, directive, formatters);
         }
         return;
       }
@@ -153,7 +155,7 @@ class ElementBinder {
         case '@': // string
           var taskId = tasks.registerTask();
           nodeAttrs.observe(attrName, (value) {
-            dstPathFn.assign(controller, value);
+            dstPathFn.assign(directive, value);
             tasks.completeTask(taskId);
           });
           break;
@@ -162,13 +164,13 @@ class ElementBinder {
           if (nodeAttrs[attrName] == null) return;
 
           _bindTwoWay(tasks, nodeAttrs[attrName], scope, dstPathFn,
-              controller, formatters, dstExpression);
+              directive, formatters, dstExpression);
           break;
 
         case '=>': // one-way
           if (nodeAttrs[attrName] == null) return;
           _bindOneWay(tasks, nodeAttrs[attrName], scope,
-              dstPathFn, controller, formatters);
+              dstPathFn, directive, formatters);
           break;
 
         case '=>!': //  one-way, one-time
@@ -176,44 +178,53 @@ class ElementBinder {
 
           Expression attrExprFn = _parser(nodeAttrs[attrName]);
           var watch;
+          var lastOneTimeValue;
           watch = scope.watch(nodeAttrs[attrName], (value, _) {
-            if (dstPathFn.assign(controller, value) != null) {
-              watch.remove();
+            if ((lastOneTimeValue = dstPathFn.assign(directive, value)) != null && watch != null) {
+                var watchToRemove = watch;
+                watch = null;
+                scope.rootScope.domWrite(() {
+                  if (lastOneTimeValue != null) {
+                    watchToRemove.remove();
+                  } else {  // It was set to non-null, but stablized to null, wait.
+                    watch = watchToRemove;
+                  }
+                });
             }
           }, formatters: formatters);
           break;
 
         case '&': // callback
-          _bindCallback(dstPathFn, controller, nodeAttrs[attrName], scope);
+          _bindCallback(dstPathFn, directive, nodeAttrs[attrName], scope);
           break;
       }
     });
   }
 
-  _link(nodeInjector, probe, scope, nodeAttrs, formatters) {
+  void _link(nodeInjector, probe, scope, nodeAttrs, formatters) {
     _usableDirectiveRefs.forEach((DirectiveRef ref) {
       var linkTimer;
       try {
         var linkMapTimer;
         assert((linkTimer = _perf.startTimer('ng.view.link', ref.type)) != false);
-        var controller = nodeInjector.get(ref.type);
-        probe.directives.add(controller);
+        var directive = nodeInjector.get(ref.type);
+        probe.directives.add(directive);
         assert((linkMapTimer = _perf.startTimer('ng.view.link.map', ref.type)) != false);
 
         if (ref.annotation is Controller) {
-          scope.context[(ref.annotation as Controller).publishAs] = controller;
+          scope.context[(ref.annotation as Controller).publishAs] = directive;
         }
 
-        var tasks = new _TaskList(controller is AttachAware ? () {
-          if (scope.isAttached) controller.attach();
+        var tasks = new _TaskList(directive is AttachAware ? () {
+          if (scope.isAttached) directive.attach();
         } : null);
 
         if (ref.mappings.isNotEmpty) {
           if (nodeAttrs == null) nodeAttrs = new _AnchorAttrs(ref);
-          _createAttrMappings(controller, scope, ref.mappings, nodeAttrs, formatters, tasks);
+          _createAttrMappings(directive, scope, ref.mappings, nodeAttrs, formatters, tasks);
         }
 
-        if (controller is AttachAware) {
+        if (directive is AttachAware) {
           var taskId = tasks.registerTask();
           Watch watch;
           watch = scope.watch('1', // Cheat a bit.
@@ -225,8 +236,8 @@ class ElementBinder {
 
         tasks.doneRegistering();
 
-        if (controller is DetachAware) {
-          scope.on(ScopeEvent.DESTROY).listen((_) => controller.detach());
+        if (directive is DetachAware) {
+          scope.on(ScopeEvent.DESTROY).listen((_) => directive.detach());
         }
 
         assert(_perf.stopTimer(linkMapTimer) != false);
@@ -236,8 +247,8 @@ class ElementBinder {
     });
   }
 
-  _createDirectiveFactories(DirectiveRef ref, nodeModule, node, nodesAttrsDirectives, nodeAttrs,
-                            visibility) {
+  void _createDirectiveFactories(DirectiveRef ref, nodeModule, node, nodesAttrsDirectives, nodeAttrs,
+                                 visibility) {
     if (ref.type == TextMustache) {
       nodeModule.bind(TextMustache, toFactory: (Injector injector) {
         return new TextMustache(node, ref.value, injector.get(Interpolate),
@@ -272,7 +283,7 @@ class ElementBinder {
   }
 
   // Overridden in TemplateElementBinder
-  _registerViewFactory(node, parentInjector, nodeModule) {
+  void _registerViewFactory(node, parentInjector, nodeModule) {
     nodeModule..bind(ViewPort, toValue: null)
               ..bind(ViewFactory, toValue: null)
               ..bind(BoundViewFactory, toValue: null);
@@ -339,12 +350,14 @@ class ElementBinder {
  * Private class used for managing controller.attach() calls
  */
 class _TaskList {
-  var onDone;
+  Function onDone;
   final List _tasks = [];
   bool isDone = false;
+  int firstTask;
 
   _TaskList(this.onDone) {
     if (onDone == null) isDone = true;
+    firstTask = registerTask();
   }
 
   int registerTask() {
@@ -362,8 +375,8 @@ class _TaskList {
     }
   }
 
-  doneRegistering() {
-    completeTask(registerTask());
+  void doneRegistering() {
+    completeTask(firstTask);
   }
 }
 
@@ -387,14 +400,13 @@ class TaggedTextBinder {
   final int offsetIndex;
 
   TaggedTextBinder(this.binder, this.offsetIndex);
-  toString() => "[TaggedTextBinder binder:$binder offset:$offsetIndex]";
+  String toString() => "[TaggedTextBinder binder:$binder offset:$offsetIndex]";
 }
 
 // Used for the tagging compiler
 class TaggedElementBinder {
   final ElementBinder binder;
   int parentBinderOffset;
-  var injector;
   bool isTopLevel;
 
   List<TaggedTextBinder> textBinders;
@@ -406,7 +418,8 @@ class TaggedElementBinder {
     textBinders.add(tagged);
   }
 
+  bool get isDummy => binder == null && textBinders == null && !isTopLevel;
+
   String toString() => "[TaggedElementBinder binder:$binder parentBinderOffset:"
-                       "$parentBinderOffset textBinders:$textBinders "
-                       "injector:$injector]";
+                       "$parentBinderOffset textBinders:$textBinders]";
 }

@@ -8,13 +8,13 @@ module.exports = function(config) {
     // all tests must be 'included', but all other libraries must be 'served' and
     // optionally 'watched' only.
     files: [
+      'packages/web_components/platform.js',
+      'packages/web_components/dart_support.js',
       'test/*.dart',
       'test/**/*_spec.dart',
       'test/config/init_guinness.dart',
       {pattern: '**/*.dart', watched: true, included: false, served: true},
-      'packages/browser/dart.js',
-      'packages/browser/interop.js',
-      'packages/shadow_dom/shadow_dom.debug.js'
+      'packages/browser/dart.js'
     ],
 
     exclude: [
@@ -27,8 +27,8 @@ module.exports = function(config) {
 
     // If browser does not capture in given timeout [ms], kill it
     captureTimeout: 20000,
-    // 5 minutes is enough time for dart2js to run on Travis...
-    browserNoActivityTimeout: 300000,
+    // Time for dart2js to run on Travis... [ms]
+    browserNoActivityTimeout: 900000,
 
     plugins: [
       'karma-dart',
@@ -44,10 +44,14 @@ module.exports = function(config) {
     },
 
     customLaunchers: {
-      ChromeNoSandbox: { base: 'Chrome', flags: ['--no-sandbox'] }
+      ChromeNoSandbox: { base: 'Chrome', flags: ['--no-sandbox'] },
+      // Only needed for Chrome 34.  These features are enabled by default in Chrome 35.
+      DartiumWithWebPlatform: {
+        base: 'Dartium',
+        flags: ['--enable-experimental-web-platform-features'] }
     },
 
-    browsers: ['Dartium'],
+    browsers: ['DartiumWithWebPlatform'],
 
     preprocessors: {
       'test/core/parser/generated_getter_setter.dart': ['parser-getter-setter']

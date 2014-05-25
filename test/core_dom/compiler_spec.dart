@@ -19,6 +19,10 @@ forBothCompilers(fn) {
     });
     fn();
   });
+}
+
+forAllCompilersAndComponentFactories(fn) {
+  forBothCompilers(fn);
 
   describe('transcluding components', () {
     beforeEachModule((Module m) {
@@ -33,6 +37,29 @@ forBothCompilers(fn) {
 
 void main() {
   forBothCompilers(() =>
+  describe('TranscludingComponentFactory', () {
+    TestBed _;
+
+    beforeEachModule((Module m) {
+      return m
+          ..bind(ComponentFactory, toImplementation: TranscludingComponentFactory)
+          ..bind(SimpleComponent);
+    });
+
+    beforeEach(inject((TestBed tb) => _ = tb));
+
+    it('should correctly detach transcluded content when scope destroyed', async(() {
+      var scope = _.rootScope.createChild({});
+      var element = _.compile(r'<div><simple><span ng-if="true == true">trans</span></simple></div>', scope: scope);
+      microLeap();
+      _.rootScope.apply();
+      expect(element).toHaveText('INNER(trans)');
+      scope.destroy();
+      expect(element).toHaveText('INNER()');
+    }));
+  }));
+
+  forAllCompilersAndComponentFactories(() =>
   describe('dte.compiler', () {
     TestBed _;
 
@@ -253,6 +280,7 @@ void main() {
     describe('components', () {
       beforeEachModule((Module module) {
         module
+          ..bind(AttachWithAttr)
           ..bind(CamelCaseMapComponent)
           ..bind(IoComponent)
           ..bind(IoControllerComponent)
@@ -269,7 +297,8 @@ void main() {
           ..bind(SometimesComponent)
           ..bind(ExprAttrComponent)
           ..bind(LogElementComponent)
-          ..bind(SayHelloFormatter);
+          ..bind(SayHelloFormatter)
+          ..bind(OneTimeDecorator);
       });
 
       it('should select on element', async(() {
@@ -626,6 +655,15 @@ void main() {
           expect(logger).toEqual(['SimpleAttachComponent']);
         }));
 
+        it('should call attach after mappings have been set', async((Logger logger) {
+          _.compile('<attach-with-attr attr="a" oneway="1+1"></attach-with-attr>');
+
+          _.rootScope.apply();
+          microLeap();
+
+          expect(logger).toEqual(['attr', 'oneway', 'attach']);
+        }));
+
         it('should inject compenent element as the dom.Element', async((Logger log, TestBed _, MockHttpBackend backend) {
           backend.whenGET('foo.html').respond('<div>WORKED</div>');
           _.compile('<log-element></log-element>');
@@ -689,6 +727,64 @@ void main() {
             expect(_.rootElement.shadowRoot).toBeNotNull();
           }
         }));
+      });
+
+      describe('bindings', () {
+        it('should set a one-time binding with the correct value', (Logger logger) {
+          _.compile(r'<div one-time="v"></div>');
+
+          _.rootScope.context['v'] = 1;
+
+          var context = _.rootScope.context;
+          _.rootScope.watch('3+4', (v, _) => context['v'] = v);
+
+          // In the 1st digest iteration:
+          //   v will be set to 7
+          //   OneTimeDecorator.value will be set to 1
+          // In the 2nd digest iteration:
+          //   OneTimeDecorator.value will be set to 7
+          _.rootScope.apply();
+
+          expect(logger).toEqual([1, 7]);
+        });
+
+        it('should keep one-time binding until it is set to non-null', (Logger logger) {
+          _.compile(r'<div one-time="v"></div>');
+          _.rootScope.context['v'] = null;
+          _.rootScope.apply();
+          expect(logger).toEqual([null]);
+
+          _.rootScope.context['v'] = 7;
+          _.rootScope.apply();
+          expect(logger).toEqual([null, 7]);
+
+          // Check that the binding is removed.
+          _.rootScope.context['v'] = 8;
+          _.rootScope.apply();
+          expect(logger).toEqual([null, 7]);
+        });
+
+        it('should remove the one-time binding only if it stablizied to null', (Logger logger) {
+          _.compile(r'<div one-time="v"></div>');
+
+          _.rootScope.context['v'] = 1;
+
+          var context = _.rootScope.context;
+          _.rootScope.watch('3+4', (v, _) => context['v'] = null);
+
+          _.rootScope.apply();
+          expect(logger).toEqual([1, null]);
+
+          // Even though there was a null in the unstable model, we shouldn't remove the binding
+          context['v'] = 8;
+          _.rootScope.apply();
+           expect(logger).toEqual([1, null, 8]);
+
+          // Check that the binding is removed.
+          _.rootScope.context['v'] = 9;
+          _.rootScope.apply();
+          expect(logger).toEqual([1, null, 8]);
+        });
       });
     });
 
@@ -1119,6 +1215,19 @@ class SimpleAttachComponent implements AttachAware, ShadowRootAware {
   onShadowRoot(_) => logger('onShadowRoot');
 }
 
+@Decorator(
+    selector: 'attach-with-attr'
+)
+class AttachWithAttr implements AttachAware {
+  Logger logger;
+  AttachWithAttr(this.logger);
+  attach() => logger('attach');
+  @NgAttr('attr')
+  set attr(v) => logger('attr');
+  @NgOneWay('oneway')
+  set oneway(v) => logger('oneway');
+}
+
 @Component(
     selector: 'log-element',
     templateUrl: 'foo.html')
@@ -1129,4 +1238,15 @@ class LogElementComponent{
     logger(node);
     logger(shadowRoot);
   }
+}
+
+@Decorator(
+    selector: '[one-time]',
+    map: const {
+      'one-time': '=>!value'
+})
+class OneTimeDecorator {
+  Logger log;
+  OneTimeDecorator(this.log);
+  set value(v) => log(v);
 }
