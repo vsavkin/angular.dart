@@ -6,11 +6,12 @@ List<dom.Node> cloneElements(elements) {
 
 class MappingParts {
   final String attrName;
+  final AST attrValueAST;
   final String mode;
-  final String dstExpression;
+  final AST dstAST;
   final String originalValue;
 
-  const MappingParts(this.attrName, this.mode, this.dstExpression, this.originalValue);
+  const MappingParts(this.attrName, this.attrValueAST, this.mode, this.dstAST, this.originalValue);
 }
 
 class DirectiveRef {
@@ -19,15 +20,17 @@ class DirectiveRef {
   final Key typeKey;
   final Directive annotation;
   final String value;
+  final AST valueAST;
   final mappings = new List<MappingParts>();
 
-  DirectiveRef(this.element, this.type, this.annotation, this.typeKey, [ this.value ]);
+  DirectiveRef(this.element, this.type, this.annotation, this.typeKey, [ this.value, this.valueAST ]);
 
   String toString() {
     var html = element is dom.Element
         ? (element as dom.Element).outerHtml
         : element.nodeValue;
     return '{ element: $html, selector: ${annotation.selector}, value: $value, '
+           'ast: ${valueAST == null ? 'null' : '$valueAST'}, '
            'type: $type }';
   }
 }
@@ -39,7 +42,7 @@ class DirectiveRef {
 Injector forceNewDirectivesAndFormatters(Injector injector, List<Module> modules) {
   modules.add(new Module()
       ..bind(Scope, toFactory: (i) {
-        var scope = i.parent.get(Scope);
+        var scope = i.parent.getByKey(SCOPE_KEY);
         return scope.createChild(new PrototypeMap(scope.context));
       }));
 

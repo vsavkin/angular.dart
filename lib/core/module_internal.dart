@@ -15,15 +15,17 @@ import 'package:angular/core/annotation_src.dart';
 
 import 'package:angular/change_detection/watch_group.dart';
 export 'package:angular/change_detection/watch_group.dart';
+import 'package:angular/change_detection/ast_parser.dart';
 import 'package:angular/change_detection/change_detection.dart';
 import 'package:angular/change_detection/dirty_checking_change_detector.dart';
+import 'package:angular/core/formatter.dart';
+export 'package:angular/core/formatter.dart';
 import 'package:angular/core/parser/utils.dart';
-import 'package:angular/core/parser/syntax.dart' as syntax;
 import 'package:angular/core/registry.dart';
+import 'package:angular/core/static_keys.dart';
 
 part "cache.dart";
 part "exception_handler.dart";
-part 'formatter.dart';
 part "interpolate.dart";
 part "scope.dart";
 part "zone.dart";
@@ -39,7 +41,7 @@ class CoreModule extends Module {
     bind(FormatterMap);
     bind(Interpolate);
     bind(RootScope);
-    bind(Scope, toFactory: (injector) => injector.get(RootScope));
+    bind(Scope, toFactory: (injector) => injector.getByKey(ROOT_SCOPE_KEY));
     bind(ClosureMap, toFactory: (_) => throw "Must provide dynamic/static ClosureMap.");
     bind(ScopeStats);
     bind(ScopeStatsEmitter);
@@ -52,5 +54,6 @@ class CoreModule extends Module {
     bind(DynamicParser);
     bind(DynamicParserBackend);
     bind(Lexer);
+    bind(ASTParser);
   }
 }

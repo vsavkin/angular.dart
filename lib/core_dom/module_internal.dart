@@ -13,8 +13,10 @@ import 'package:angular/core/annotation_src.dart' show SHADOW_DOM_INJECTOR_NAME;
 import 'package:angular/core/module_internal.dart';
 import 'package:angular/core/parser/parser.dart';
 import 'package:angular/core_dom/dom_util.dart' as util;
+import 'package:angular/core_dom/static_keys.dart';
 
 import 'package:angular/change_detection/watch_group.dart' show Watch, PrototypeMap;
+import 'package:angular/change_detection/ast_parser.dart';
 import 'package:angular/core/registry.dart';
 
 import 'package:angular/directive/module.dart' show NgBaseCss;
@@ -44,7 +46,6 @@ part 'transcluding_component_factory.dart';
 part 'tree_sanitizer.dart';
 part 'walking_compiler.dart';
 part 'ng_element.dart';
-part 'static_keys.dart';
 
 class CoreDomModule extends Module {
   CoreDomModule() {

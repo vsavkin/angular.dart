@@ -15,10 +15,8 @@ class BoundViewFactory {
 
   BoundViewFactory(this.viewFactory, this.injector);
 
-  static Key _SCOPE_KEY = new Key(Scope);
-
   View call(Scope scope) =>
-      viewFactory(injector.createChild([new Module()..bindByKey(_SCOPE_KEY, toValue: scope)]));
+      viewFactory(injector.createChild([new Module()..bindByKey(SCOPE_KEY, toValue: scope)]));
 }
 
 abstract class ViewFactory implements Function {
@@ -51,7 +49,7 @@ class WalkingViewFactory implements ViewFactory {
     var timerId;
     try {
       assert((timerId = _perf.startTimer('ng.view')) != false);
-      var view = new View(nodes, injector.get(EventHandler));
+      var view = new View(nodes, injector.getByKey(EVENT_HANDLER_KEY));
       _link(view, nodes, elementBinders, injector);
       return view;
     } finally {
@@ -120,6 +118,7 @@ class WalkingViewFactory implements ViewFactory {
 @Injectable()
 class ViewCache {
   // _viewFactoryCache is unbounded
+  // This cache contains both HTML and URL keys.
   final viewFactoryCache = new LruCache<String, ViewFactory>();
   final Http http;
   final TemplateCache templateCache;
@@ -140,8 +139,15 @@ class ViewCache {
   }
 
   async.Future<ViewFactory> fromUrl(String url, DirectiveMap directives) {
-    return http.get(url, cache: templateCache).then(
-        (resp) => fromHtml(resp.responseText, directives));
+    ViewFactory viewFactory = viewFactoryCache.get(url);
+    if (viewFactory == null) {
+      return http.get(url, cache: templateCache).then((resp) {
+        var viewFactoryFromHttp = fromHtml(resp.responseText, directives);
+        viewFactoryCache.put(url, viewFactoryFromHttp);
+        return viewFactoryFromHttp;
+      });
+    }
+    return new async.Future.value(viewFactory);
   }
 }
 

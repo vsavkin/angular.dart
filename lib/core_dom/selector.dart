@@ -23,12 +23,15 @@ part of angular.core.dom_internal;
 class DirectiveSelector {
   ElementBinderFactory _binderFactory;
   DirectiveMap _directives;
+  Interpolate _interpolate;
+  FormatterMap _formatters;
+  ASTParser _astParser;
   var elementSelector = new _ElementSelector('');
   var attrSelector = <_ContainsSelector>[];
   var textSelector = <_ContainsSelector>[];
 
   /// Parses all the [_directives] so they can be retrieved via [matchElement]
-  DirectiveSelector(this._directives, this._binderFactory) {
+  DirectiveSelector(this._directives, this._formatters, this._binderFactory, this._interpolate, this._astParser) {
     _directives.forEach((Directive annotation, Type type) {
       var match;
       var selector = annotation.selector;
@@ -56,7 +59,7 @@ class DirectiveSelector {
   ElementBinder matchElement(dom.Node node) {
     assert(node is dom.Element);
 
-    ElementBinderBuilder builder = _binderFactory.builder();
+    ElementBinderBuilder builder = _binderFactory.builder(_formatters);
     List<_ElementSelector> partialSelection;
     final classes = new Set<String>();
     final attrs = <String, String>{};
@@ -84,7 +87,7 @@ class DirectiveSelector {
       if (attrName.startsWith("on-")) {
         builder.onEvents[attrName] = value;
       } else if (attrName.startsWith("bind-")) {
-        builder.bindAttrs[attrName] = value;
+        builder.bindAttrs[attrName] = _astParser(value, formatters: _formatters);
       }
 
       attrs[attrName] = value;
@@ -95,8 +98,11 @@ class DirectiveSelector {
           // we need to pass the name to the directive by prefixing it to
           // the value. Yes it is a bit of a hack.
           _directives[selectorRegExp.annotation].forEach((type) {
+            // Pre-compute the AST to watch this value.
+            String expression = _interpolate(value);
+            AST valueAST = _astParser(expression, formatters: _formatters);
             builder.addDirective(new DirectiveRef(
-                node, type, selectorRegExp.annotation, new Key(type), '$attrName=$value'));
+                node, type, selectorRegExp.annotation, new Key(type), attrName, valueAST));
           });
         }
       }
@@ -123,22 +129,26 @@ class DirectiveSelector {
   }
 
   ElementBinder matchText(dom.Node node) {
-    ElementBinderBuilder builder = _binderFactory.builder();
+    ElementBinderBuilder builder = _binderFactory.builder(_formatters);
 
     var value = node.nodeValue;
     for (var k = 0; k < textSelector.length; k++) {
       var selectorRegExp = textSelector[k];
       if (selectorRegExp.regexp.hasMatch(value)) {
         _directives[selectorRegExp.annotation].forEach((type) {
+          // Pre-compute the AST to watch this value.
+          String expression = _interpolate(value);
+          var valueAST = _astParser(expression, formatters: _formatters);
+
           builder.addDirective(new DirectiveRef(node, type,
-              selectorRegExp.annotation, new Key(type), value));
+              selectorRegExp.annotation, new Key(type), value, valueAST));
         });
       }
     }
     return builder.binder;
   }
 
-  ElementBinder matchComment(dom.Node node) => _binderFactory.builder().binder;
+  ElementBinder matchComment(dom.Node node) => _binderFactory.builder(null).binder;
 }
 
 /**
@@ -147,11 +157,24 @@ class DirectiveSelector {
 @Injectable()
 class DirectiveSelectorFactory {
   ElementBinderFactory _binderFactory;
+  Interpolate _interpolate;
+  ASTParser _astParser;
+  // TODO(deboer): Remove once the FormatterMap is a required 'selector' parameter.
+  FormatterMap _defaultFormatterMap;
 
-  DirectiveSelectorFactory(this._binderFactory);
+  DirectiveSelectorFactory(this._binderFactory, this._interpolate,
+                           this._astParser, this._defaultFormatterMap);
 
-  DirectiveSelector selector(DirectiveMap directives) =>
-      new DirectiveSelector(directives, _binderFactory);
+  /**
+   * Create a new [DirectiveSelector] given a [DirectiveMap] and [FormatterMap]
+   *
+   * NOTE: [formatters] will become required very soon.  New code must pass
+   * both parameters.
+   */
+  DirectiveSelector selector(DirectiveMap directives, [FormatterMap formatters]) =>
+      new DirectiveSelector(directives,
+          formatters != null ? formatters : _defaultFormatterMap,
+          _binderFactory, _interpolate, _astParser);
 }
 
 class _Directive {

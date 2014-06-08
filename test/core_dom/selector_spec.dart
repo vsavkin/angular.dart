@@ -123,7 +123,9 @@ main() {
       it('should match attributes', () {
         expect(selector(element = e('<div attr="before-xyz-after"></div>')),
         toEqualsDirectiveInfos([
-            { "selector": '[*=/xyz/]', "value": 'attr=before-xyz-after',
+            { "selector": '[*=/xyz/]',
+                "value": 'attr',
+                "ast": '"before-xyz-after"',
                 "element": element, "name": 'attr'}
         ]));
       });
@@ -197,7 +199,9 @@ main() {
 
       it('should collect bind-* attributes', () {
         ElementBinder binder = selector(e('<input bind-x="y" bind-z="yy"></input>'));
-        expect(binder.bindAttrs).toEqual({'bind-x': 'y', 'bind-z': 'yy'});
+        expect(binder.bindAttrs.keys.length).toEqual(2);
+        expect(binder.bindAttrs['bind-x'].expression).toEqual('y');
+        expect(binder.bindAttrs['bind-z'].expression).toEqual('yy');
       });
     });
 
@@ -209,7 +213,9 @@ main() {
       it('should match text', () {
         expect(selector(element = e('before-abc-after')),
         toEqualsDirectiveInfos([
-            { "selector": ':contains(/abc/)', "value": 'before-abc-after',
+            { "selector": ':contains(/abc/)',
+                "value": 'before-abc-after',
+                "ast": '"before-abc-after"',
                 "element": element, "name": '#text'}
         ]));
       });
@@ -249,7 +255,8 @@ class DirectiveInfosMatcher extends Matcher {
   bool _refMatches(directiveRef, expectedMap) =>
     directiveRef.element == expectedMap['element'] &&
     directiveRef.annotation.selector == expectedMap['selector'] &&
-    directiveRef.value == expectedMap['value'];
+    directiveRef.value == expectedMap['value'] &&
+    (directiveRef.valueAST == null || directiveRef.valueAST.expression == expectedMap['ast']);
 
 
   bool matches(ElementBinder binder, matchState) {
