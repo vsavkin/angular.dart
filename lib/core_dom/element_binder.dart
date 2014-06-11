@@ -14,12 +14,10 @@ class TemplateElementBinder extends ElementBinder {
     return _directiveCache = [template];
   }
 
-  TemplateElementBinder(perf, expando, parser, componentFactory,
-                        transcludingComponentFactory, shadowDomComponentFactory,
+  TemplateElementBinder(perf, expando, parser, config,
                         this.template, this.templateBinder,
                         onEvents, bindAttrs, childMode)
-      : super(perf, expando, parser, componentFactory,
-          transcludingComponentFactory, shadowDomComponentFactory,
+      : super(perf, expando, parser, config,
           null, null, onEvents, bindAttrs, childMode);
 
   String toString() => "[TemplateElementBinder template:$template]";
@@ -45,27 +43,21 @@ class ElementBinder {
   final Profiler _perf;
   final Expando _expando;
   final Parser _parser;
+  final CompilerConfig _config;
 
-  // The default component factory
-  final ComponentFactory _componentFactory;
-  final TranscludingComponentFactory _transcludingComponentFactory;
-  final ShadowDomComponentFactory _shadowDomComponentFactory;
   final Map onEvents;
   final Map bindAttrs;
 
   // Member fields
   final decorators;
 
-  final DirectiveRef component;
+  final BoundComponentData componentData;
 
   // Can be either COMPILE_CHILDREN or IGNORE_CHILDREN
   final String childMode;
 
-  ElementBinder(this._perf, this._expando, this._parser,
-                this._componentFactory,
-                this._transcludingComponentFactory,
-                this._shadowDomComponentFactory,
-                this.component, this.decorators,
+  ElementBinder(this._perf, this._expando, this._parser, this._config,
+                this.componentData, this.decorators,
                 this.onEvents, this.bindAttrs, this.childMode);
 
   final bool hasTemplate = false;
@@ -76,7 +68,7 @@ class ElementBinder {
   var _directiveCache;
   List<DirectiveRef> get _usableDirectiveRefs {
     if (_directiveCache != null) return _directiveCache;
-    if (component != null) return _directiveCache = new List.from(decorators)..add(component);
+    if (componentData != null) return _directiveCache = new List.from(decorators)..add(componentData.ref);
     return _directiveCache = decorators;
   }
 
@@ -207,7 +199,9 @@ class ElementBinder {
   void _link(nodeInjector, probe, scope, nodeAttrs) {
     _usableDirectiveRefs.forEach((DirectiveRef ref) {
       var directive = nodeInjector.getByKey(ref.typeKey);
-      probe.directives.add(directive);
+      if (probe != null) {
+        probe.directives.add(directive);
+      }
 
       if (ref.annotation is Controller) {
         scope.context[(ref.annotation as Controller).publishAs] = directive;
@@ -257,16 +251,9 @@ class ElementBinder {
       }
       nodesAttrsDirectives.add(ref);
     } else if (ref.annotation is Component) {
-      var factory;
-      var annotation = ref.annotation as Component;
-      if (annotation.useShadowDom == true) {
-        factory = _shadowDomComponentFactory;
-      } else if (annotation.useShadowDom == false) {
-        factory = _transcludingComponentFactory;
-      } else {
-        factory = _componentFactory;
-      }
-      nodeModule.bindByKey(ref.typeKey, toFactory: factory.call(node, ref), visibility: visibility);
+      assert(ref == componentData.ref);
+
+      nodeModule.bindByKey(ref.typeKey, toFactory: componentData.factory.call(node), visibility: visibility);
     } else {
       nodeModule.bindByKey(ref.typeKey, visibility: visibility);
     }
@@ -295,8 +282,11 @@ class ElementBinder {
         ..bindByKey(VIEW_KEY, toValue: view)
         ..bindByKey(ELEMENT_KEY, toValue: node)
         ..bindByKey(NODE_KEY, toValue: node)
-        ..bindByKey(NODE_ATTRS_KEY, toValue: nodeAttrs)
-        ..bindByKey(ELEMENT_PROBE_KEY, toFactory: (_) => probe);
+        ..bindByKey(NODE_ATTRS_KEY, toValue: nodeAttrs);
+
+    if (_config.elementProbeEnabled) {
+      nodeModule.bindByKey(ELEMENT_PROBE_KEY, toFactory: (_) => probe);
+    }
 
     directiveRefs.forEach((DirectiveRef ref) {
       Directive annotation = ref.annotation;
@@ -316,9 +306,14 @@ class ElementBinder {
     _registerViewFactory(node, parentInjector, nodeModule);
 
     nodeInjector = parentInjector.createChild([nodeModule]);
-    probe = _expando[node] = new ElementProbe(
-        parentInjector.getByKey(ELEMENT_PROBE_KEY), node, nodeInjector, scope);
-    scope.on(ScopeEvent.DESTROY).listen((_) {_expando[node] = null;});
+    if (_config.elementProbeEnabled) {
+      probe = _expando[node] =
+          new ElementProbe(parentInjector.getByKey(ELEMENT_PROBE_KEY),
+                           node, nodeInjector, scope);
+      scope.on(ScopeEvent.DESTROY).listen((_) {
+        _expando[node] = null;
+      });
+    }
 
     _link(nodeInjector, probe, scope, nodeAttrs);
 
