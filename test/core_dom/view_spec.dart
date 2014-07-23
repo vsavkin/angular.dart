@@ -59,29 +59,39 @@ class BFormatter {
   call(value) => value;
 }
 
+class MockLightDom extends Mock implements DestinationLightDom {}
 
 main() {
   var viewFactoryFactory = (a,b,c,d) => new WalkingViewFactory(a,b,c,d);
   describe('View', () {
-    ViewPort viewPort;
     Element rootElement;
+
+    var expando = new Expando();
+    View a, b;
     var viewCache;
 
-    beforeEach(() {
+    ViewPort createViewPort({injector, lightDom}) {
+      final scope = injector.get(Scope);
+      final parentView = new View([], scope, null);
+
+      return new ViewPort(injector.get(DirectiveInjector), scope, parentView,
+          rootElement.childNodes[0], injector.get(Animate), lightDom);
+    }
+
+    beforeEach((Profiler perf, Injector injector) {
       rootElement = e('<div></div>');
+      rootElement.innerHtml = '<!-- anchor -->';
+
+      var scope = injector.get(Scope);
+      a = (viewFactoryFactory(es('<span>A</span>a'), [], perf, expando))(scope, injector.get(DirectiveInjector));
+      b = (viewFactoryFactory(es('<span>B</span>b'), [], perf, expando))(scope, injector.get(DirectiveInjector));
     });
 
     describe('mutation', () {
-      var a, b;
-      var expando = new Expando();
+      ViewPort viewPort;
 
-      beforeEach((Injector injector, Profiler perf) {
-        rootElement.innerHtml = '<!-- anchor -->';
-        var scope = injector.get(Scope);
-        viewPort = new ViewPort(injector.get(DirectiveInjector), scope, rootElement.childNodes[0],
-          injector.get(Animate));
-        a = (viewFactoryFactory(es('<span>A</span>a'), [], perf, expando))(scope, injector.get(DirectiveInjector));
-        b = (viewFactoryFactory(es('<span>B</span>b'), [], perf, expando))(scope, injector.get(DirectiveInjector));
+      beforeEach((Injector injector) {
+        viewPort = createViewPort(injector: injector);
       });
 
 
@@ -198,7 +208,72 @@ main() {
           expect(rootElement).toHaveHtml('<!-- anchor --><span>B</span>b<span>A</span>a');
         });
       });
+
+
+      describe("light dom notification", () {
+        ViewPort viewPort;
+        MockLightDom lightDom;
+        Scope scope;
+
+        beforeEach((Injector injector) {
+          lightDom = new MockLightDom();
+
+          viewPort = createViewPort(injector: injector, lightDom: lightDom);
+        });
+
+        it('should notify light on insert', (RootScope scope) {
+          viewPort.insert(a);
+          scope.flush();
+
+          lightDom.getLogs(callsTo('redistribute')).verify(happenedOnce);
+        });
+
+        it('should notify light on remove', (RootScope scope) {
+          viewPort.insert(a);
+          scope.flush();
+          lightDom.clearLogs();
+
+          viewPort.remove(a);
+          scope.flush();
+
+          lightDom.getLogs(callsTo('redistribute')).verify(happenedOnce);
+        });
+
+        it('should notify light on move', (RootScope scope) {
+          viewPort.insert(a);
+          viewPort.insert(b, insertAfter: a);
+          scope.flush();
+          lightDom.clearLogs();
+
+          viewPort.move(a, moveAfter: b);
+          scope.flush();
+
+          lightDom.getLogs(callsTo('redistribute')).verify(happenedOnce);
+        });
+      });
     });
+
+    describe("nodes", () {
+      ViewPort viewPort;
+
+      beforeEach((Injector injector) {
+        viewPort = createViewPort(injector: injector);
+      });
+
+      it("should return all the nodes from all the views", (RootScope scope) {
+        viewPort.insert(a);
+        viewPort.insert(b, insertAfter: a);
+
+        scope.flush();
+
+        expect(viewPort.nodes).toHaveText("AaBb");
+      });
+
+      it("should return an empty list when no views", () {
+        expect(viewPort.nodes).toEqual([]);
+      });
+    });
+
 
     describe('deferred', () {
 

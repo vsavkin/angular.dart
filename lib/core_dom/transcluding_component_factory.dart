@@ -1,70 +1,250 @@
 part of angular.core.dom_internal;
 
-@Decorator(
-   selector: 'content')
-class Content implements AttachAware, DetachAware {
-  final ContentPort _port;
-  final dom.Element _element;
-  dom.Comment _beginComment;
-  Content(this._port, this._element);
+abstract class _ContentStrategy {
+  void attach();
+  void detach();
+  void insert(Iterable<dom.Node> nodes);
+}
 
-  void attach() {
-    if (_port == null) return;
-    _beginComment = _port.content(_element);
+/**
+ * A null implementation of the content tag that is used by Shadow DOM components.
+ * The distirbution is handled by the browser, so Angular does nothing.
+ */
+class _ShadowDomContent implements _ContentStrategy {
+  void attach(){}
+  void detach(){}
+  void insert(Iterable<dom.Node> nodes){}
+}
+
+/**
+ * An implementation of the content tag that is used by transcluding components.
+ * It is used when the content tag is not a direct child of another component,
+ * and thus does not affect redistirbution.
+ */
+class _RenderedTranscludingContent implements _ContentStrategy {
+  final SourceLightDom _sourceLightDom;
+  final Content _content;
+
+  static final dom.ScriptElement _beginScriptTemplate =
+      new dom.ScriptElement()..classes.add("start-content-tag");
+
+  static final dom.ScriptElement _endScriptTemplate =
+      new dom.ScriptElement()..classes.add("end-content-tag");
+
+  dom.ScriptElement _beginScript;
+  dom.ScriptElement _endScript;
+
+  _RenderedTranscludingContent(this._content, this._sourceLightDom);
+
+  void attach(){
+    _replaceContentElementWithScriptTags();
+    _sourceLightDom.redistribute();
   }
-  
-  void detach() {
-    if (_port == null) return;
-    _port.detachContent(_beginComment);
+
+  void detach(){
+    _removeScriptTags();
+    _sourceLightDom.redistribute();
+  }
+
+  void insert(Iterable<dom.Node> nodes){
+    final p = _endScript.parent;
+    if (p != null) p.insertAllBefore(nodes, _endScript);
+  }
+
+  void _replaceContentElementWithScriptTags() {
+    _beginScript = _beginScriptTemplate.clone(true);
+    _endScript = _endScriptTemplate.clone(true);
+
+    final el = _content.element;
+    el.parent.insertBefore(_beginScript, el);
+    el.parent.insertBefore(_endScript, el);
+    el.remove();
+  }
+
+  void _removeScriptTags() {
+    _removeNodesBetweenScriptTags();
+    _beginScript.remove();
+    _endScript.remove();
+  }
+
+  void _removeNodesBetweenScriptTags() {
+    final p = _beginScript.parent;
+    for (var next = _beginScript.nextNode;
+        next.nodeType != dom.Node.ELEMENT_NODE || next.attributes["end-content-tag"] != null;
+        next = _beginScript.nextNode) {
+      p.nodes.remove(next);
+    }
   }
 }
 
-class ContentPort {
-  dom.Element _element;
-  var _childNodes = [];
+class _IntermediateTranscludingContent implements _ContentStrategy {
+  final SourceLightDom _sourceLightDom;
+  final DestinationLightDom _destinationLightDom;
+  final Content _content;
 
-  ContentPort(this._element);
+  dom.ScriptElement _beginScript;
+  dom.ScriptElement _endScript;
+
+  _IntermediateTranscludingContent(this._content, this._sourceLightDom, this._destinationLightDom);
+
+  void attach(){
+    _sourceLightDom.redistribute();
+  }
+
+  void detach(){
+    _sourceLightDom.redistribute();
+  }
+
+  void insert(Iterable<dom.Node> nodes){
+    _content.element.nodes = nodes;
+    _destinationLightDom.redistribute();
+  }
+}
+
+@Decorator(selector: 'content')
+class Content implements AttachAware, DetachAware {
+  dom.Element element;
+
+  @NgAttr('select')
+  String select;
+
+  final SourceLightDom _sourceLightDom;
+  final DestinationLightDom _destinationLightDom;
+  var _strategy;
+
+  Content(this.element, this._sourceLightDom, this._destinationLightDom, View view) {
+    view.addContent(this);
+  }
+
+  void attach() => strategy.attach();
+  void detach() => strategy.detach();
+  void insert(Iterable<dom.Node> nodes) => strategy.insert(nodes);
+
+  _ContentStrategy get strategy {
+    if (_strategy == null) _strategy = _createContentStrategy();
+    return _strategy;
+  }
+
+  _ContentStrategy _createContentStrategy() {
+    if (_sourceLightDom == null) {
+      return new _ShadowDomContent();
+    } else if (_destinationLightDom != null && _destinationLightDom.hasRoot(element)) {
+      return new _IntermediateTranscludingContent(this, _sourceLightDom, _destinationLightDom);
+    } else {
+      return new _RenderedTranscludingContent(this, _sourceLightDom);
+    }
+  }
+}
+
+
+
+@Injectable()
+abstract class SourceLightDom {
+  void redistribute();
+  void addContent(Content c);
+  void removeContent(Content c);
+}
+
+@Injectable()
+abstract class DestinationLightDom {
+  void redistribute();
+  void addViewPort(ViewPort viewPort);
+  bool hasRoot(dom.Element element);
+}
+
+class LightDom implements SourceLightDom, DestinationLightDom {
+  final dom.Element _componentElement;
+
+  final List<dom.Node> _lightDomRootNodes = [];
+  final Map<dom.Comment, ViewPort> _ports = {};
+
+  final Scope _scope;
+
+  View _shadowDomView;
+
+  LightDom(this._componentElement, this._scope);
 
   void pullNodes() {
-    _childNodes.addAll(_element.nodes);
-    _element.nodes = [];
+    _lightDomRootNodes.addAll(_componentElement.nodes);
+
+    // This is needed because _lightDomRootNodes can contains viewports,
+    // which cannot be detached.
+    final fakeRoot = new dom.DivElement();
+    fakeRoot.nodes.addAll(_lightDomRootNodes);
+
+    _componentElement.nodes = [];
   }
 
-  content(dom.Element elt) {
-    var hash = elt.hashCode;
-    var beginComment = null;
-
-    if (_childNodes.isNotEmpty) {
-      beginComment = new dom.Comment("content $hash");
-      elt.parent.insertBefore(beginComment, elt);
-      elt.parent.insertAllBefore(_childNodes, elt);
-      elt.parent.insertBefore(new dom.Comment("end-content $hash"), elt);
-      _childNodes = [];
-    }
-
-    elt.remove();
-    return beginComment;
+  set shadowDomView(View view) {
+    this._shadowDomView = view;
+    _componentElement.nodes = view.nodes;
   }
 
-  void detachContent(dom.Comment _beginComment) {
-    // Search for endComment and extract everything in between.
-    // TODO optimize -- there may be a better way of pulling out nodes.
+  void addViewPort(ViewPort viewPort) {
+    _ports[viewPort.placeholder] = viewPort;
+    redistribute();
+  }
 
-    if (_beginComment == null) {
-      return;
+  //TODO: vsavkin Add dirty flag after implementing view-scoped dom writes.
+  void redistribute() {
+    _scope.rootScope.domWrite(() {
+      redistributeNodes(_sortedContents, _expandedLightDomRootNodes);
+    });
+  }
+
+  bool hasRoot(dom.Element element) =>
+      _lightDomRootNodes.contains(element);
+
+  List<Content> get _sortedContents {
+    final res = [];
+    _collectAllContentTags(_shadowDomView, res);
+    return res;
+  }
+
+  void _collectAllContentTags(item, List<Content> acc) {
+    if (item is Content) {
+      acc.add(item);
+
+    } else if (item is View) {
+      for (final i in item.insertionPoints) {
+        _collectAllContentTags(i, acc);
+      }
+
+    } else if (item is ViewPort) {
+      for (final i in item.views) {
+        _collectAllContentTags(i, acc);
+      }
     }
+  }
 
-    var endCommentText = "end-${_beginComment.text}";
-
-    var next;
-    for (next = _beginComment.nextNode;
-         next.nodeType != dom.Node.COMMENT_NODE || next.text != endCommentText;
-         next = _beginComment.nextNode) {
-      _childNodes.add(next);
-      next.remove();
+  List<dom.Node> get _expandedLightDomRootNodes {
+    final list = [];
+    for(final root in _lightDomRootNodes) {
+      if (_ports.containsKey(root)) {
+        list.addAll(_ports[root].nodes);
+      } else if (root is dom.ContentElement) {
+        list.addAll(root.nodes);
+      } else {
+        list.add(root);
+      }
     }
-    assert(next.nodeType == dom.Node.COMMENT_NODE && next.text == endCommentText);
-    next.remove();
+    return list;
+  }
+}
+
+void redistributeNodes(Iterable<Content> contents, List<dom.Node> nodes) {
+  for (final content in contents) {
+    final select = content.select;
+    matchSelector(n) => n.nodeType == dom.Node.ELEMENT_NODE && n.matches(select);
+
+    if (select == null) {
+      content.insert(nodes);
+      nodes.clear();
+    } else {
+      final matchingNodes = nodes.where(matchSelector);
+      content.insert(matchingNodes);
+      nodes.removeWhere(matchSelector);
+    }
   }
 }
 
@@ -114,37 +294,37 @@ class BoundTranscludingComponentFactory implements BoundComponentFactory {
       var childInjectorCompleter; // Used if the ViewFuture is available before the childInjector.
 
       var component = _component;
-      var contentPort = new ContentPort(element);
+      var lightDom = new LightDom(element, scope);
 
       // Append the component's template as children
       var elementFuture;
 
       if (_viewFuture != null) {
         elementFuture = _viewFuture.then((ViewFactory viewFactory) {
-          contentPort.pullNodes();
+          lightDom.pullNodes();
+
           if (childInjector != null) {
-            element.nodes.addAll(
-                viewFactory.call(childInjector.scope, childInjector).nodes);
+            lightDom.shadowDomView = viewFactory.call(childInjector.scope, childInjector);
             return element;
           } else {
             childInjectorCompleter = new async.Completer();
             return childInjectorCompleter.future.then((childInjector) {
-              element.nodes.addAll(
-                  viewFactory.call(childInjector.scope, childInjector).nodes);
+              lightDom.shadowDomView = viewFactory.call(childInjector.scope, childInjector);
               return element;
             });
           }
         });
       } else {
-        elementFuture = new async.Future.microtask(() => contentPort.pullNodes());
+        elementFuture = new async.Future.microtask(() => lightDom.pullNodes());
       }
       TemplateLoader templateLoader = new TemplateLoader(elementFuture);
 
       Scope shadowScope = scope.createChild(new HashMap());
 
-      childInjector = new ShadowlessComponentDirectiveInjector(injector, injector.appInjector,
-          eventHandler, shadowScope, view, templateLoader, new ShadowlessShadowRoot(element),
-          contentPort);
+      childInjector = new TranscludingComponentDirectiveInjector(injector, injector.appInjector,
+          eventHandler, shadowScope, view, templateLoader, new TransclusionBasedShadowRoot(element),
+          lightDom);
+
       childInjector.bindByKey(_ref.typeKey, _ref.factory, _ref.paramKeys, _ref.annotation.visibility);
 
       if (childInjectorCompleter != null) {

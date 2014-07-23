@@ -42,7 +42,7 @@ part 'ng_element.dart';
 part 'node_cursor.dart';
 part 'selector.dart';
 part 'shadow_dom_component_factory.dart';
-part 'shadowless_shadow_root.dart';
+part 'transclusion_based_shadow_root.dart';
 part 'tagging_compiler.dart';
 part 'tagging_view_factory.dart';
 part 'template_cache.dart';
@@ -76,7 +76,8 @@ class CoreDomModule extends Module {
     bind(ShadowDomComponentFactory);
     bind(TranscludingComponentFactory);
     bind(Content);
-    bind(ContentPort, toValue: null);
+    bind(DestinationLightDom, toValue: null);
+    bind(SourceLightDom, toValue: null);
     bind(ComponentCssRewriter);
     bind(WebPlatform);
 
