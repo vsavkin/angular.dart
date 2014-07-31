@@ -26,9 +26,9 @@ AVAILABLE_DART_VERSION=$(curl "https://storage.googleapis.com/dart-archive/chann
 # shipper in Dart version 1.5.8.
 #
 # Ref: https://travis-ci.org/angular/angular.dart/jobs/33106780
-# 
+#
 #   Dart VM version: 1.5.8 (Tue Jul 29 07:05:41 2014) on "linux_x64"
-#   Resolving dependencies... 
+#   Resolving dependencies...
 #   Incompatible version constraints on barback:
 #   - angular 0.13.0 depends on version 0.14.1+3
 #   - pub itself depends on version >=0.13.0 <0.14.1
