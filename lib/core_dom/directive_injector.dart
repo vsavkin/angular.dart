@@ -107,6 +107,7 @@ class DirectiveInjector implements DirectiveBinder {
   final Animate _animate;
   final EventHandler _eventHandler;
   Scope scope;  //TODO(misko): this should be final after we get rid of controller
+  final View _view;
 
   NgElement _ngElement;
   ElementProbe _elementProbe;
@@ -141,7 +142,7 @@ class DirectiveInjector implements DirectiveBinder {
   static Binding _tempBinding = new Binding();
 
   DirectiveInjector(parent, appInjector, this._node, this._nodeAttrs, this._eventHandler,
-                    this.scope, this._animate)
+                    this.scope, this._view, this._animate)
       : appInjector = appInjector,
         parent = parent == null ? new DefaultDirectiveInjector(appInjector) : parent;
 
@@ -150,6 +151,7 @@ class DirectiveInjector implements DirectiveBinder {
         _nodeAttrs = null,
         _eventHandler = null,
         scope = null,
+        _view = null,
         _animate = null;
 
   void bind(key, {dynamic toValue: DEFAULT_VALUE,
@@ -266,6 +268,7 @@ class DirectiveInjector implements DirectiveBinder {
       case NG_ELEMENT_KEY_ID:         return ngElement;
       case EVENT_HANDLER_KEY_ID:      return _eventHandler;
       case CONTENT_PORT_KEY_ID:       return parent._getById(keyId);
+      case VIEW_KEY_ID:               return _view;
       default: new NoProviderError(_KEYS[keyId]);
     }
   }
@@ -345,8 +348,8 @@ class TemplateDirectiveInjector extends DirectiveInjector {
 
   TemplateDirectiveInjector(DirectiveInjector parent, Injector appInjector,
                        Node node, NodeAttrs nodeAttrs, EventHandler eventHandler,
-                       Scope scope, Animate animate, this._viewFactory)
-    : super(parent, appInjector, node, nodeAttrs, eventHandler, scope, animate);
+                       Scope scope, View view, Animate animate, this._viewFactory)
+    : super(parent, appInjector, node, nodeAttrs, eventHandler, scope, view, animate);
 
 
   Object _getById(int keyId) {
@@ -368,10 +371,10 @@ abstract class ComponentDirectiveInjector extends DirectiveInjector {
   final ShadowRoot _shadowRoot;
 
   ComponentDirectiveInjector(DirectiveInjector parent, Injector appInjector,
-                        EventHandler eventHandler, Scope scope,
+                        EventHandler eventHandler, Scope scope, View view,
                         this._templateLoader, this._shadowRoot)
       : super(parent, appInjector, parent._node, parent._nodeAttrs, eventHandler, scope,
-              parent._animate);
+              view, parent._animate);
 
   Object _getById(int keyId) {
     switch(keyId) {
@@ -389,9 +392,9 @@ class ShadowlessComponentDirectiveInjector extends ComponentDirectiveInjector {
   final ContentPort _contentPort;
 
   ShadowlessComponentDirectiveInjector(DirectiveInjector parent, Injector appInjector,
-                                  EventHandler eventHandler, Scope scope,
+                                  EventHandler eventHandler, Scope scope, View view,
                                   templateLoader, shadowRoot, this._contentPort)
-      : super(parent, appInjector, eventHandler, scope, templateLoader, shadowRoot);
+      : super(parent, appInjector, eventHandler, scope, view, templateLoader, shadowRoot);
 
   Object _getById(int keyId) {
     switch(keyId) {
@@ -403,11 +406,11 @@ class ShadowlessComponentDirectiveInjector extends ComponentDirectiveInjector {
 
 class ShadowDomComponentDirectiveInjector extends ComponentDirectiveInjector {
   ShadowDomComponentDirectiveInjector(DirectiveInjector parent, Injector appInjector,
-                                 Scope scope, templateLoader, shadowRoot)
+                                 Scope scope, View view, templateLoader, shadowRoot)
       : super(parent, appInjector, new ShadowRootEventHandler(shadowRoot,
                                                parent.getByKey(EXPANDO_KEY),
                                                parent.getByKey(EXCEPTION_HANDLER_KEY)),
-            scope, templateLoader, shadowRoot);
+            scope, view, templateLoader, shadowRoot);
 
   ElementProbe get elementProbe {
     if (_elementProbe == null) {

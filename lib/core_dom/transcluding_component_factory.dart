@@ -97,7 +97,7 @@ class BoundTranscludingComponentFactory implements BoundComponentFactory {
   }
 
   List<Key> get callArgs => _CALL_ARGS;
-  static var _CALL_ARGS = [ DIRECTIVE_INJECTOR_KEY, SCOPE_KEY,
+  static var _CALL_ARGS = [ DIRECTIVE_INJECTOR_KEY, SCOPE_KEY, VIEW_KEY,
                             VIEW_CACHE_KEY, HTTP_KEY, TEMPLATE_CACHE_KEY,
                             DIRECTIVE_MAP_KEY, NG_BASE_CSS_KEY, EVENT_HANDLER_KEY];
   Function call(dom.Node node) {
@@ -106,7 +106,7 @@ class BoundTranscludingComponentFactory implements BoundComponentFactory {
            _component.cssUrls.isEmpty);
 
     var element = node as dom.Element;
-    return (DirectiveInjector injector, Scope scope,
+    return (DirectiveInjector injector, Scope scope, View view,
             ViewCache viewCache, Http http, TemplateCache templateCache,
             DirectiveMap directives, NgBaseCss baseCss, EventHandler eventHandler) {
 
@@ -143,7 +143,7 @@ class BoundTranscludingComponentFactory implements BoundComponentFactory {
       Scope shadowScope = scope.createChild(new HashMap());
 
       childInjector = new ShadowlessComponentDirectiveInjector(injector, injector.appInjector,
-          eventHandler, shadowScope, templateLoader, new ShadowlessShadowRoot(element),
+          eventHandler, shadowScope, view, templateLoader, new ShadowlessShadowRoot(element),
           contentPort);
       childInjector.bindByKey(_ref.typeKey, _ref.factory, _ref.paramKeys, _ref.annotation.visibility);
 
