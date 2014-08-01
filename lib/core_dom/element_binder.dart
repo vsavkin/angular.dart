@@ -252,11 +252,11 @@ class ElementBinder {
     DirectiveInjector nodeInjector;
     if (this is TemplateElementBinder) {
       nodeInjector = new TemplateDirectiveInjector(parentInjector, parentInjector.appInjector,
-          node, nodeAttrs, eventHandler, scope, animate,
+          node, nodeAttrs, eventHandler, scope, view, animate,
           (this as TemplateElementBinder).templateViewFactory);
     } else {
       nodeInjector = new DirectiveInjector(parentInjector, parentInjector.appInjector,
-          node, nodeAttrs, eventHandler, scope, animate);
+          node, nodeAttrs, eventHandler, scope, view, animate);
     }
 
     for(var i = 0; i < directiveRefs.length; i++) {

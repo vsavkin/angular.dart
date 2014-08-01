@@ -119,11 +119,11 @@ class BoundShadowDomComponentFactory implements BoundComponentFactory {
   }
 
   List<Key> get callArgs => _CALL_ARGS;
-  static final _CALL_ARGS = [DIRECTIVE_INJECTOR_KEY, SCOPE_KEY, NG_BASE_CSS_KEY,
+  static final _CALL_ARGS = [DIRECTIVE_INJECTOR_KEY, SCOPE_KEY, VIEW_KEY, NG_BASE_CSS_KEY,
                              EVENT_HANDLER_KEY];
   Function call(dom.Element element) {
-    return (DirectiveInjector injector, Scope scope, NgBaseCss baseCss,
-            EventHandler eventHandler) {
+    return (DirectiveInjector injector, Scope scope, View view,
+            NgBaseCss baseCss, EventHandler eventHandler) {
       var shadowDom = element.createShadowRoot()
         ..applyAuthorStyles = _component.applyAuthorStyles
         ..resetStyleInheritance = _component.resetStyleInheritance;
@@ -165,7 +165,7 @@ class BoundShadowDomComponentFactory implements BoundComponentFactory {
 
       var probe;
       shadowInjector = new ShadowDomComponentDirectiveInjector(injector, injector.appInjector,
-          shadowScope, templateLoader, shadowDom);
+          shadowScope, view, templateLoader, shadowDom);
       shadowInjector.bindByKey(_ref.typeKey, _ref.factory, _ref.paramKeys, _ref.annotation.visibility);
 
       if (_f.config.elementProbeEnabled) {

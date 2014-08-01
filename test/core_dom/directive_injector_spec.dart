@@ -14,6 +14,7 @@ void main() {
     describe('base', () {
       DirectiveInjector injector;
       Scope scope;
+      View view;
       Animate animate;
 
       addDirective(Type type, [Visibility visibility]) {
@@ -29,7 +30,9 @@ void main() {
       beforeEach((Scope _scope, Animate _animate) {
         scope = _scope;
         animate = _animate;
-        injector = new DirectiveInjector(null, appInjector, div, new NodeAttrs(div), eventHandler, scope, animate);
+        view = new View([], scope, eventHandler);
+        injector = new DirectiveInjector(null, appInjector, div, new NodeAttrs(div), eventHandler,
+            scope, view, animate);
       });
 
       it('should return basic types', () {
@@ -39,6 +42,7 @@ void main() {
         expect(injector.get(Injector)).toBe(appInjector);
         expect(injector.get(DirectiveInjector)).toBe(injector);
         expect(injector.get(Scope)).toBe(scope);
+        expect((injector.get(View))).toBe(view);
         expect(injector.get(Node)).toBe(div);
         expect(injector.get(Element)).toBe(div);
         expect((injector.get(NodeAttrs) as NodeAttrs).element).toBe(div);
@@ -71,8 +75,8 @@ void main() {
         DirectiveInjector leafInjector;
 
         beforeEach(() {
-          childInjector = new DirectiveInjector(injector, appInjector, span, null, null, null, null);
-          leafInjector = new DirectiveInjector(childInjector, appInjector, span, null, null, null, null);
+          childInjector = new DirectiveInjector(injector, appInjector, span, null, null, null, null, null);
+          leafInjector = new DirectiveInjector(childInjector, appInjector, span, null, null, null, null, null);
         });
 
         it('should not allow reseting visibility', () {
