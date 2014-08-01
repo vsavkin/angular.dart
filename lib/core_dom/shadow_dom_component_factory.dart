@@ -105,35 +105,35 @@ class BoundShadowDomComponentFactory implements BoundComponentFactory {
     dom.NodeTreeSanitizer treeSanitizer = _componentFactory.treeSanitizer;
 
     return _componentFactory.styleElementCache.putIfAbsent(
-        new _ComponentAssetKey(_tag, cssUrl), () =>
-        http.get(cssUrl, cache: templateCache)
-        .then((resp) => _componentFactory.resourceResolver.resolveCssText(resp.responseText, Uri.parse(cssUrl)),
-        onError: (e) => '/*\n$e\n*/\n')
-        .then((String css) {
+        new _ComponentAssetKey(_tag, cssUrl),
+        () => http.get(cssUrl, cache: templateCache)
+                  .then((resp) => _componentFactory.resourceResolver
+                            .resolveCssText(resp.responseText, Uri.parse(cssUrl)),
+                        onError: (e) => '/*$e*/')
+                  .then((String css) {
 
-          // Shim CSS if required
-          if (platform.cssShimRequired) {
-            css = platform.shimCss(css, selector: _tag, cssUrl: cssUrl);
-          }
+                    // Shim CSS if required
+                    if (platform.cssShimRequired) {
+                      css = platform.shimCss(css, selector: _tag, cssUrl: cssUrl);
+                    }
 
-          // If a css rewriter is installed, run the css through a rewriter
-          var styleElement = new dom.StyleElement()
-            ..appendText(componentCssRewriter(css, selector: _tag,
-          cssUrl: cssUrl));
+                    // If a css rewriter is installed, run the css through a rewriter
+                    var styleElement = new dom.StyleElement()
+                      ..appendText(componentCssRewriter(css, selector: _tag, cssUrl: cssUrl));
 
-          // ensure there are no invalid tags or modifications
-          treeSanitizer.sanitizeTree(styleElement);
+                    // ensure there are no invalid tags or modifications
+                    treeSanitizer.sanitizeTree(styleElement);
 
-          // If the css shim is required, it means that scoping does not
-          // work, and adding the style to the head of the document is
-          // preferrable.
-          if (platform.cssShimRequired) {
-            dom.document.head.append(styleElement);
-            return null;
-          }
+                    // If the css shim is required, it means that scoping does not
+                    // work, and adding the style to the head of the document is
+                    // preferrable.
+                    if (platform.cssShimRequired) {
+                      dom.document.head.append(styleElement);
+                      return null;
+                    }
 
-          return styleElement;
-        })
+                    return styleElement;
+                  })
     );
   }
 

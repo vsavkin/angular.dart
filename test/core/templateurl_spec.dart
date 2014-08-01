@@ -203,12 +203,7 @@ _run({resolveUrls, staticMode}) {
 
         backend.flushGET('${prefix}simple.css').respond(500, 'some error');
         microLeap();
-
-        expect(element.first).toHaveText(
-            '/*\n'
-            'HTTP 500: some error\n'
-            '*/\n'
-            'inline!');
+        expect(element.first).toHaveText('/*HTTP 500: some error*/inline!');
       }));
 
       it('should load a CSS with no template', async(
