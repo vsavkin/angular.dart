@@ -1,12 +1,12 @@
 library angular.dom.platform_spec;
 
 import '../_specs.dart';
+import 'package:browser_detect/browser_detect.dart';
 
 import 'dart:js' as js;
 
 main() {
   describe('WebPlatform', () {
-
     beforeEachModule((Module module) {
       module
         ..bind(_WebPlatformTestComponent)
@@ -19,14 +19,18 @@ main() {
     it('should scope styles to shadow dom across browsers.',
       async((TestBed _, MockHttpBackend backend, WebPlatform platform) {
 
-      Element element = e('<span><test-wptc><span>ignore'
-        '</span></test-wptc></span>');
+      // TODO(vicb) WebPlatform does not work with polyfills
+      // see https://github.com/angular/angular.dart/issues/1300
+      if (platform.cssShimRequired) return;
+
+      Element element = e('<span><test-wptc><span>ignore</span></test-wptc></span>');
 
       _.compile(element);
 
-      backend
-          ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css').respond(200, 'span {background-color: red;}')
-          ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html').respond(200, '<span>foo</span>');
+      backend..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css')
+                 .respond(200, 'span {background-color: red;}')
+             ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html')
+                 .respond(200, '<span>foo</span>');
 
       try {
         document.body.append(element);
@@ -53,35 +57,42 @@ main() {
     it('should not crash with an attribute selector; but wont work either..',
        async((TestBed _, MockHttpBackend backend, WebPlatform platform) {
 
-      Element element = e('<span><test-wptca a><span>ignore'
-      '</span></test-wptca></span>');
+      // TODO(vicb) WebPlatform does not work with polyfills
+      // see https://github.com/angular/angular.dart/issues/1300
+      if (platform.cssShimRequired) return;
+
+      Element element = e('<span><test-wptca a><span>ignore</span></test-wptca></span>');
 
       _.compile(element);
 
-      backend
-        ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css').respond(200, 'span{background-color: red}')
-        ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html').respond(200, '<span>foo</span>');
+      backend..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css')
+                 .respond(200, 'span{background-color: red}')
+             ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html')
+                 .respond(200, '<span>foo</span>');
     }));
 
     it('should scope :host styles to the primary element.',
     async((TestBed _, MockHttpBackend backend, WebPlatform platform) {
 
-      Element element = e('<span><test-wptc><span>ignore'
-        '</span></test-wptc></span>');
+      // TODO(vicb) WebPlatform does not work with polyfills
+      // see https://github.com/angular/angular.dart/issues/1300
+      if (platform.cssShimRequired) return;
+
+      Element element = e('<span><test-wptc><span>ignore</span></test-wptc></span>');
 
       _.compile(element);
 
-      backend
-        ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css').respond(200, ':host {background-color: red; }')
-        ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html').respond(200, '<span>foo</span>');
+      backend..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/style.css')
+                 .respond(200, ':host {background-color: red; }')
+             ..flushGET('${TEST_SERVER_BASE_PREFIX}test/core_dom/template.html')
+                 .respond(200, '<span>foo</span>');
 
       try {
         document.body.append(element);
         microLeap();
 
         // Element should be styled.
-        expect(element.children[0].getComputedStyle().backgroundColor)
-          .toEqual("rgb(255, 0, 0)");
+        expect(element.children[0].getComputedStyle().backgroundColor).toEqual("rgb(255, 0, 0)");
 
       } finally {
         element.remove();
@@ -101,22 +112,20 @@ main() {
 
       backend
           ..flushGET('style.css').respond(200,
-            "polyfill-next-selector { content: ':host span:not([:host])'; }"
-            "::content span { background-color: red; }")
-          ..flushGET('template.html').respond(200,
-            '<span><content></content></span>');
+              "polyfill-next-selector { content: ':host span:not([:host])'; }"
+              "::content span { background-color: red; }")
+          ..flushGET('template.html').respond(200, '<span><content></content></span>');
 
       try {
         document.body.append(element);
         microLeap();
 
         // Child span should be styled.
-        expect(element.children[0].getComputedStyle().backgroundColor)
-        .toEqual("rgb(255, 0, 0)");
+        expect(element.children[0].getComputedStyle().backgroundColor).toEqual("rgb(255, 0, 0)");
 
         // Shadow span should not be styled.
-        expect(element.shadowRoot.querySelector("span").getComputedStyle()
-        .backgroundColor).not.toEqual("rgb(255, 0, 0)");
+        expect(element.shadowRoot.querySelector("span").getComputedStyle().backgroundColor)
+            .not.toEqual("rgb(255, 0, 0)");
 
       } finally {
         element.remove();
@@ -133,18 +142,16 @@ main() {
       _.compile(element);
 
 
-      backend
-          ..flushGET('outer-style.css').respond(200,
-            'my-inner::shadow .foo {background-color: red; }')
-          ..flushGET('outer-html.html').respond(200,
-            '<my-inner><span class="foo">foo</span></my-inner>');
+      backend..flushGET('outer-style.css').respond(200,
+                 'my-inner::shadow .foo {background-color: red; }')
+             ..flushGET('outer-html.html').respond(200,
+                 '<my-inner><span class="foo">foo</span></my-inner>');
 
       microLeap();
 
-      backend
-          ..flushGET('inner-style.css').respond(200, '/* no style */')
-          ..flushGET('inner-html.html').respond(200,
-            '<span class="foo"><content></content></span>');
+      backend..flushGET('inner-style.css').respond(200, '/* no style */')
+             ..flushGET('inner-html.html').respond(200,
+                 '<span class="foo"><content></content></span>');
 
       try {
         document.body.append(element);
@@ -156,8 +163,7 @@ main() {
 
         // inner element foo should be styled red.
         expect(element.shadowRoot.querySelector("my-inner").shadowRoot
-        .querySelector("span").getComputedStyle().backgroundColor)
-          .toEqual("rgb(255, 0, 0)");
+        .querySelector("span").getComputedStyle().backgroundColor).toEqual("rgb(255, 0, 0)");
 
       } finally {
         element.remove();
