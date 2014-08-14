@@ -56,98 +56,127 @@ class ViewFactory implements Function {
     if (nodes == null) {
       nodes = cloneElements(templateNodes);
     }
-    var view = new View(nodes, scope);
-    _link(view, scope, nodes, directiveInjector);
+    var view = new _ViewFactoryCall(this, scope, directiveInjector).createView(nodes);
     traceLeave(s);
-
-    return view;
-  }
-
-  void _bindTagged(TaggedElementBinder tagged, int elementBinderIndex,
-                   DirectiveInjector rootInjector,
-                   List<DirectiveInjector> elementInjectors, View view, boundNode, Scope scope) {
-    var binder = tagged.binder;
-    DirectiveInjector parentInjector =
-        tagged.parentBinderOffset == -1 ? rootInjector : elementInjectors[tagged.parentBinderOffset];
-
-    var elementInjector;
-    if (binder == null) {
-      elementInjector = parentInjector;
-    } else {
-      // TODO(misko): Remove this after we remove controllers. No controllers -> 1to1 Scope:View.
-      if (parentInjector != rootInjector && parentInjector.scope != null) {
-        scope = parentInjector.scope;
-      }
-      elementInjector = binder.bind(view, scope, parentInjector, boundNode);
-    }
-    // TODO(misko): Remove this after we remove controllers. No controllers -> 1to1 Scope:View.
-    if (elementInjector != rootInjector && elementInjector.scope != null) {
-      scope = elementInjector.scope;
-    }
-    elementInjectors[elementBinderIndex] = elementInjector;
-
-    if (tagged.textBinders != null) {
-      for (var k = 0; k < tagged.textBinders.length; k++) {
-        TaggedTextBinder taggedText = tagged.textBinders[k];
-        var childNode = boundNode.childNodes[taggedText.offsetIndex];
-        taggedText.binder.bind(view, scope, elementInjector, childNode);
-      }
-    }
-  }
-
-  View _link(View view, Scope scope, List<dom.Node> nodeList, DirectiveInjector rootInjector) {
-    var elementInjectors = new List<DirectiveInjector>(elementBinders.length);
-    var directiveDefsByName = {};
-
-    var elementBinderIndex = 0;
-    for (int i = 0; i < nodeList.length; i++) {
-      dom.Node node = nodeList[i];
-      NodeLinkingInfo linkingInfo = nodeLinkingInfos[i];
-
-      // if node isn't attached to the DOM, create a parent for it.
-      var parentNode = node.parentNode;
-      var fakeParent = false;
-      if (parentNode == null) {
-        fakeParent = true;
-        parentNode = new dom.DivElement();
-        parentNode.append(node);
-      }
-
-      if (linkingInfo.isElement) {
-        if (linkingInfo.containsNgBinding) {
-          var tagged = elementBinders[elementBinderIndex];
-          _bindTagged(tagged, elementBinderIndex, rootInjector,
-              elementInjectors, view, node, scope);
-          elementBinderIndex++;
-        }
-
-        if (linkingInfo.ngBindingChildren) {
-          var elts = (node as dom.Element).querySelectorAll('.ng-binding');
-          for (int j = 0; j < elts.length; j++, elementBinderIndex++) {
-            TaggedElementBinder tagged = elementBinders[elementBinderIndex];
-            _bindTagged(tagged, elementBinderIndex, rootInjector, elementInjectors,
-                        view, elts[j], scope);
-          }
-        }
-      } else {
-        TaggedElementBinder tagged = elementBinders[elementBinderIndex];
-        assert(tagged.binder != null || tagged.isTopLevel);
-        if (tagged.binder != null) {
-          _bindTagged(tagged, elementBinderIndex, rootInjector,
-              elementInjectors, view, node, scope);
-        }
-        elementBinderIndex++;
-      }
-
-      if (fakeParent) {
-        // extract the node from the parentNode.
-        nodeList[i] = parentNode.nodes[0];
-      }
-    }
     return view;
   }
 }
 
+class _ViewFactoryCall {
+  final ViewFactory factory;
+  final Scope scope;
+  final DirectiveInjector rootInjector;
+  final List<DirectiveInjector> elementInjectors;
+  final _Hydrator hydrator = new _Hydrator();
+
+  _ViewFactoryCall(ViewFactory factory, this.scope, this.rootInjector)
+      : factory = factory,
+      elementInjectors = new List<DirectiveInjector>(factory.elementBinders.length);
+
+  View createView(List<dom.Node> nodeList) {
+    final view = new View(nodeList, scope);
+
+    var elementBinderIndex = 0;
+    for (int i = 0; i < nodeList.length; i++) {
+      final node = nodeList[i];
+      final linkingInfo = factory.nodeLinkingInfos[i];
+
+      if (linkingInfo.containsNgBinding) {
+        bindTagged(elementBinderIndex, node, view);
+        elementBinderIndex++;
+      }
+
+      if (linkingInfo.ngBindingChildren) {
+        var elts = (node as dom.Element).querySelectorAll('.ng-binding');
+        elts.forEach((el) {
+          bindTagged(elementBinderIndex, el, view);
+          elementBinderIndex++;
+        });
+      }
+
+      if (!linkingInfo.isElement) {
+        bindTagged(elementBinderIndex, node, view);
+        elementBinderIndex++;
+      }
+    }
+
+    hydrator.hydrate();
+    return view;
+  }
+
+  void bindTagged(int elementBinderIndex, dom.Node node, View view) {
+    final tagged = factory.elementBinders[elementBinderIndex];
+    final binder = tagged.binder;
+    final parentInjector = parentInjectorFor(tagged);
+
+    final scopeForElement = scopeFor(parentInjector);
+    final elementInjector = bindElement(binder, view, scopeForElement, node, parentInjector);
+    elementInjectors[elementBinderIndex] = elementInjector;
+
+    final scopeForTextNodes = scopeFor(elementInjector, parentInjector);
+    bindTextNodes(tagged, node, view, scopeForTextNodes, elementInjector);
+  }
+
+  DirectiveInjector parentInjectorFor(TaggedElementBinder tagged) =>
+      tagged.parentBinderOffset == -1 ? rootInjector : elementInjectors[tagged.parentBinderOffset];
+
+  DirectiveInjector bindElement(ElementBinder binder, View view, Scope scope, dom.Node node,
+      DirectiveInjector parentInjector) {
+    if (binder == null || !binder.hasDirectivesOrEvents) return parentInjector;
+    final injector = binder.setUp(view, scope, parentInjector, node);
+    hydrator.addEntry(binder, injector);
+    return injector;
+  }
+
+  void bindTextNodes(TaggedElementBinder tagged, dom.Node node, View view, Scope scope,
+      DirectiveInjector parentInjector) {
+    if (tagged.textBinders == null || tagged.textBinders.isEmpty) return;
+    tagged.textBinders.forEach((textBinder) {
+      bindTextNode(textBinder, node, view, scope, parentInjector);
+    });
+  }
+
+  void bindTextNode(TaggedTextBinder tagged, dom.Node parentNode, View view, Scope scope,
+      DirectiveInjector parentInjector) {
+    final binder = tagged.binder;
+    if (binder.hasDirectivesOrEvents) {
+      final childNode = parentNode.childNodes[tagged.offsetIndex];
+      final injector = binder.setUp(view, scope, parentInjector, childNode);
+      hydrator.addEntry(binder, injector);
+    }
+  }
+
+  // TODO(misko): Remove this after we remove controllers. No controllers -> 1to1 Scope:View.
+  Scope scopeFor(DirectiveInjector parent, [DirectiveInjector element]) {
+    if (element != rootInjector && element != null && element.scope != null) {
+      return element.scope;
+    } else if (parent != rootInjector && parent != null && parent.scope != null) {
+      return parent.scope;
+    } else {
+      return scope;
+    }
+  }
+}
+
+class _Hydrator extends LinkedList<_HydratorEntry> {
+  void hydrate() {
+    forEach((entry) => entry.hydrate());
+  }
+
+  void addEntry(ElementBinder binder, DirectiveInjector injector) {
+    add(new _HydratorEntry(binder, injector));
+  }
+}
+
+class _HydratorEntry extends LinkedListEntry<_HydratorEntry> {
+  final ElementBinder binder;
+  final DirectiveInjector directiveInjector;
+  _HydratorEntry(this.binder, this.directiveInjector);
+
+  void hydrate() {
+    binder.hydrate(directiveInjector, directiveInjector.scope);
+  }
+}
 
 class NodeLinkingInfo {
   /**
