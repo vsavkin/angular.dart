@@ -1,5 +1,7 @@
 part of angular.core.dom_internal;
 
+const NG_BINDING = 'ng-binding';
+const NG_BINDING_SELECTOR = '.$NG_BINDING';
 
 /**
  * BoundViewFactory is a [ViewFactory] which does not need Injector because

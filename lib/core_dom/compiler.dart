@@ -136,10 +136,8 @@ class Compiler implements Function {
       DirectiveRef directiveRef,
       ElementBinder transcludedElementBinder,
       DirectiveMap directives) {
-    var anchorName = directiveRef.annotation.selector +
-        (directiveRef.value != null ? '=' + directiveRef.value : '');
 
-    var transcludeCursor = templateCursor.replaceWithAnchor(anchorName);
+    var transcludeCursor = templateCursor.replaceWithAnchor(_anchorAttrs(directiveRef));
     var elementBinders = [];
     _compileView(transcludeCursor, transcludedElementBinder,
         directives, -1, null, elementBinders, true);
@@ -149,6 +147,9 @@ class Compiler implements Function {
 
     return viewFactory;
   }
+
+  Map<String, String> _anchorAttrs(DirectiveRef directiveRef) =>
+      {'type': 'ng/ViewPort/${directiveRef.type}', 'value' : directiveRef.value};
 
   List<TaggedElementBinder> _removeUnusedBinders(List<TaggedElementBinder> binders) {
     // In order to support text nodes with directiveless parents, we

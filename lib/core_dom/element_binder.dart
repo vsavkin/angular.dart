@@ -244,7 +244,7 @@ class ElementBinder {
   DirectiveInjector bind(View view, Scope scope,
                          DirectiveInjector parentInjector,
                          dom.Node node, EventHandler eventHandler, Animate animate) {
-    var nodeAttrs = node is dom.Element ? new NodeAttrs(node) : null;
+    var nodeAttrs = (node is dom.Element && !_viewPort(node)) ? new NodeAttrs(node) : null;
 
     var directiveRefs = _usableDirectiveRefs;
     if (!hasDirectivesOrEvents) return parentInjector;
@@ -311,6 +311,11 @@ class ElementBinder {
     }
     return nodeInjector;
   }
+
+  bool _viewPort(dom.Node node) =>
+    (node is dom.TemplateElement &&
+      node.attributes["type"] != null &&
+      node.attributes["type"].startsWith("ng/ViewPort/"));
 
   String toString() => "[ElementBinder decorators:$decorators]";
 }
