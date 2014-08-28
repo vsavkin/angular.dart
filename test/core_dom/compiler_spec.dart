@@ -294,6 +294,7 @@ void main() {
           ..bind(PublishMeDirective)
           ..bind(LogComponent)
           ..bind(AttachDetachComponent)
+          ..bind(BindingAwareComponent)
           ..bind(SimpleAttachComponent)
           ..bind(SimpleComponent)
           ..bind(MultipleContentTagsComponent)
@@ -850,6 +851,67 @@ void main() {
             // If we don't have a shadowRoot, this is an invalid check
             element.shadowRoot != null ? element.shadowRoot : log[2]]);
         }));
+
+        describe("updateBinding", () {
+          it("should call updateBinding when a field gets updated via two way binding",
+              async((Logger logger) {
+            _.compile('<binding-aware two-way="expr"></binding-aware>');
+            _.rootScope.context["expr"] = "expr";
+
+            _.rootScope.apply();
+            microLeap();
+
+            expect(logger).toEqual(['<=>expr,=>null,=>!null']);
+          }));
+
+          it("should call updateBinding when a field gets updated via one way binding",
+              async((Logger logger) {
+            _.compile('<binding-aware one-way="expr"></binding-aware>');
+            _.rootScope.context["expr"] = "expr";
+
+            _.rootScope.apply();
+            microLeap();
+
+            expect(logger).toEqual(['<=>null,=>expr,=>!null']);
+          }));
+
+          it("should call updateBinding when a field gets updated via one time one way binding",
+              async((Logger logger) {
+            _.compile('<binding-aware once="expr"></binding-aware>');
+            _.rootScope.context["expr"] = "expr";
+
+            _.rootScope.apply();
+            microLeap();
+
+            expect(logger).toEqual(['<=>null,=>null,=>!expr']);
+          }));
+
+          it("should not call updateBinding when not bindings have been updated",
+              async((Logger logger) {
+            _.compile('<binding-aware once="expr"></binding-aware>');
+            _.rootScope.context["expr"] = "expr";
+
+            _.rootScope.apply();
+            microLeap();
+
+            logger.clear();
+            _.rootScope.apply();
+            microLeap();
+
+            expect(logger).toEqual([]);
+          }));
+
+          it("should call updateBinding only once even if multiple properties has been updated",
+              async((Logger logger) {
+            _.compile('<binding-aware one-way="expr" two-way="expr"></binding-aware>');
+            _.rootScope.context["expr"] = "expr";
+
+            _.rootScope.apply();
+            microLeap();
+
+            expect(logger).toEqual(['<=>expr,=>expr,=>!null']);
+          }));
+        });
       });
 
       describe('invalid components', () {
@@ -1498,6 +1560,28 @@ class AttachDetachComponent implements AttachAware, DetachAware, ShadowRootAware
   onShadowRoot(shadowRoot) {
     scope.rootScope.context['shadowRoot'] = shadowRoot;
     logger(shadowRoot);
+  }
+}
+
+@Component(
+    selector: 'binding-aware',
+    template: 'static',
+    map: const {
+        'two-way': '<=>twoWay',
+        'one-way': '=>oneWay',
+        'once': '=>!once'
+    })
+class BindingAwareComponent implements BindingAware {
+  Logger logger;
+
+  String twoWay;
+  String oneWay;
+  String once;
+
+  BindingAwareComponent(this.logger);
+
+  void updateBinding() {
+    logger('<=>$twoWay,=>$oneWay,=>!$once');
   }
 }
 

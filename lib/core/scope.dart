@@ -140,6 +140,25 @@ abstract class ScopeAware {
 }
 
 /**
+ * [BindingNotifier] is used to schedule notifications of controllers implementing [BindingAware].
+ */
+class BindingNotifier extends LinkedListEntry {
+  final _controller;
+  final LinkedList<BindingNotifier> _list;
+
+  BindingNotifier(this._controller, this._list);
+
+  void scheduleNotification() {
+    if (_controller is BindingAware && !_isScheduled) _list.add(this);
+  }
+
+  void notify() => _controller.updateBinding();
+
+  bool get _isScheduled =>
+      next != null || previous != null || (_list.length == 1 && _list.first == this);
+}
+
+/**
  * [Scope] represents a collection of [watch]es [observer]s, and a [context] for the watchers,
  * observers and [eval]uations. Scopes structure loosely mimics the DOM structure. Scopes and
  * [View]s are bound to each other. As scopes are created and destroyed by [ViewFactory] they are
@@ -319,6 +338,7 @@ class Scope {
     } finally {
       rootScope.._transitionState(RootScope.STATE_APPLY, null)
                ..digest()
+               ..notifyBindingAwareDirectives()
                ..flush();
     }
   }
@@ -622,6 +642,8 @@ class RootScope extends Scope {
   _FunctionChain _domWriteHead, _domWriteTail;
   _FunctionChain _domReadHead, _domReadTail;
 
+  final LinkedList<BindingNotifier> _bindingNotifiers = new LinkedList();
+
   final ScopeStats _scopeStats;
 
   String _state;
@@ -760,6 +782,10 @@ class RootScope extends Scope {
     }
   }
 
+  void notifyBindingAwareDirectives() {
+    _bindingNotifiers..forEach((n) => n.notify())..clear();
+  }
+
   void flush() {
     _stats.flushStart();
     _transitionState(null, STATE_FLUSH);
@@ -893,6 +919,9 @@ class RootScope extends Scope {
     else if (to == STATE_FLUSH_ASSERT) wtfScope = Scope_assert;
     _state_wtf_scope = wtfScope == null ? null : traceEnter(wtfScope);
   }
+
+  BindingNotifier createBindingNotifierFor(controller) =>
+      new BindingNotifier(controller, _bindingNotifiers);
 }
 
 /**

@@ -70,7 +70,7 @@ class ElementBinder {
       _usableDirectiveRefs.isNotEmpty || onEvents.isNotEmpty || bindAttrs.isNotEmpty;
 
   void _bindTwoWay(tasks, AST ast, scope, directiveScope,
-                   controller, AST dstAST) {
+                   controller, AST dstAST, BindingNotifier bindingNotifier) {
     var taskId = (tasks != null) ? tasks.registerTask() : 0;
 
     var viewOutbound = false;
@@ -81,6 +81,7 @@ class ElementBinder {
         scope.rootScope.runAsync(() => viewOutbound = false);
         var value = dstAST.parsedExp.assign(controller, inboundValue);
         if (tasks != null) tasks.completeTask(taskId);
+        bindingNotifier.scheduleNotification();
         return value;
       }
     });
@@ -96,12 +97,13 @@ class ElementBinder {
     }
   }
 
-  void _bindOneWay(tasks, ast, scope, AST dstAST, controller) {
+  void _bindOneWay(tasks, ast, scope, AST dstAST, controller, BindingNotifier bindingNotifier) {
     var taskId = (tasks != null) ? tasks.registerTask() : 0;
 
     scope.watchAST(ast, (v, _) {
       dstAST.parsedExp.assign(controller, v);
       if (tasks != null) tasks.completeTask(taskId);
+      bindingNotifier.scheduleNotification();
     });
   }
 
@@ -111,6 +113,8 @@ class ElementBinder {
 
 
   void _createAttrMappings(directive, scope, List<MappingParts> mappings, nodeAttrs, tasks) {
+    final bindingNotifier = scope.rootScope.createBindingNotifierFor(directive);
+
     Scope directiveScope; // Only created if there is a two-way binding in the element.
     for(var i = 0; i < mappings.length; i++) {
       MappingParts p = mappings[i];
@@ -131,11 +135,11 @@ class ElementBinder {
             directiveScope = scope.createChild(directive);
           }
           _bindTwoWay(tasks, bindAttr, scope, directiveScope,
-              directive, dstAST);
+              directive, dstAST, bindingNotifier);
         } else if (p.mode == '&') {
           throw "Callbacks do not support bind- syntax";
         } else {
-          _bindOneWay(tasks, bindAttr, scope, dstAST, directive);
+          _bindOneWay(tasks, bindAttr, scope, dstAST, directive, bindingNotifier);
         }
         continue;
       }
@@ -155,12 +159,12 @@ class ElementBinder {
             directiveScope = scope.createChild(directive);
           }
           _bindTwoWay(tasks, attrValueAST, scope, directiveScope,
-              directive, dstAST);
+              directive, dstAST, bindingNotifier);
           break;
 
         case '=>': // one-way
           if (nodeAttrs[attrName] == null) continue;
-          _bindOneWay(tasks, attrValueAST, scope, dstAST, directive);
+          _bindOneWay(tasks, attrValueAST, scope, dstAST, directive, bindingNotifier);
           break;
 
         case '=>!': //  one-way, one-time
@@ -169,6 +173,7 @@ class ElementBinder {
           var watch;
           var lastOneTimeValue;
           watch = scope.watchAST(attrValueAST, (value, _) {
+            bindingNotifier.scheduleNotification();
             if ((lastOneTimeValue = dstAST.parsedExp.assign(directive, value)) != null && watch != null) {
                 var watchToRemove = watch;
                 watch = null;

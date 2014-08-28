@@ -542,6 +542,15 @@ abstract class DetachAware {
 }
 
 /**
+ * A directives or components may chose to implements [BindingAware].[updateBinding] method.
+ * If implemented the method will be called when at least one bound property was updated
+ * during the digest phase.
+ */
+abstract class BindingAware {
+  void updateBinding();
+}
+
+/**
  * Use the @[Formatter] class annotation to identify a class as a formatter.
  *
  * A formatter is a pure function that performs a transformation on input data from an expression.
