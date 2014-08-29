@@ -41,6 +41,12 @@ class PrefixedUrlRewriter extends UrlRewriter {
 
 void main() {
   describe('template url', () {
+    TestBed _;
+
+    beforeEach((TestBed tb) {
+      _ = tb;
+    });
+
     afterEach((MockHttpBackend backend) {
       backend.verifyNoOutstandingExpectation();
       backend.verifyNoOutstandingRequest();
@@ -89,55 +95,48 @@ void main() {
       });
 
       it('should replace element with template from url', async(
-          (Http http, Compiler compile, Scope rootScope,  Logger log,
-           Injector injector, MockHttpBackend backend, DirectiveMap directives) {
+          (Logger log, MockHttpBackend backend) {
         backend.expectGET('simple.html').respond(200, '<div log="SIMPLE">Simple!</div>');
 
-        var element = es('<div><simple-url log>ignore</simple-url><div>');
-        compile(element, directives)(rootScope, null, element);
+        var element = _.compile('<div><simple-url log>ignore</simple-url><div>');
 
         microLeap();
         backend.flush();
         microLeap();
 
-        expect(element[0]).toHaveText('Simple!');
-        rootScope.apply();
+        expect(element).toHaveText('Simple!');
+        _.rootScope.apply();
         // Note: There is no ordering.  It is who ever comes off the wire first!
         expect(log.result()).toEqual('LOG; SIMPLE');
       }));
 
       it('should load template from URL once', async(
-          (Http http, Compiler compile, Scope rootScope,  Logger log,
-           Injector injector, MockHttpBackend backend, DirectiveMap directives) {
+          (Logger log, MockHttpBackend backend) {
         backend.whenGET('simple.html').respond(200, '<div log="SIMPLE">Simple!</div>');
 
-        var element = es(
-            '<div>'
-            '<simple-url log>ignore</simple-url>'
-            '<simple-url log>ignore</simple-url>'
-            '<div>');
-        compile(element, directives)(rootScope, null, element);
+        var element = _.compile('<div>'
+          '<simple-url log>ignore</simple-url>'
+          '<simple-url log>ignore</simple-url>'
+        '<div>');
 
         microLeap();
         backend.flush();
         microLeap();
 
-        expect(element.first).toHaveText('Simple!Simple!');
-        rootScope.apply();
+        expect(element).toHaveText('Simple!Simple!');
+        _.rootScope.apply();
 
         // Note: There is no ordering.  It is who ever comes off the wire first!
         expect(log.result()).toEqual('LOG; LOG; SIMPLE; SIMPLE');
       }));
 
       it('should load a CSS file into a style', async(
-          (Http http, Compiler compile, Scope rootScope, Logger log,
-           Injector injector, MockHttpBackend backend, DirectiveMap directives) {
+          (Logger log, MockHttpBackend backend) {
         backend
             ..expectGET('simple.css').respond(200, '.hello{}')
             ..expectGET('simple.html').respond(200, '<div log="SIMPLE">Simple!</div>');
 
-        var element = e('<div><html-and-css log>ignore</html-and-css><div>');
-        compile([element], directives)(rootScope, null, [element]);
+        var element = _.compile('<div><html-and-css log>ignore</html-and-css><div>');
 
         microLeap();
         backend.flush();
@@ -147,7 +146,7 @@ void main() {
         expect(element.children[0].shadowRoot).toHaveHtml(
             '<style>.hello{}</style><div log="SIMPLE">Simple!</div>'
         );
-        rootScope.apply();
+        _.rootScope.apply();
         // Note: There is no ordering.  It is who ever comes off the wire first!
         expect(log.result()).toEqual('LOG; SIMPLE');
       }));
@@ -220,15 +219,13 @@ void main() {
       });
 
       it('should load multiple CSS files into a style', async(
-          (Http http, Compiler compile, Scope rootScope, Logger log,
-           Injector injector, MockHttpBackend backend, DirectiveMap directives) {
+          (Logger log, MockHttpBackend backend) {
         backend
             ..expectGET('simple.css').respond(200, '.hello{}')
             ..expectGET('another.css').respond(200, '.world{}')
             ..expectGET('simple.html').respond(200, '<div log="SIMPLE">Simple!</div>');
 
-        var element = e('<div><html-and-css log>ignore</html-and-css><div>');
-        compile([element], directives)(rootScope, null, [element]);
+        var element = _.compile('<div><html-and-css log>ignore</html-and-css><div>');
 
         microLeap();
         backend.flush();
@@ -238,7 +235,7 @@ void main() {
         expect(element.children[0].shadowRoot).toHaveHtml(
             '<style>.hello{}</style><style>.world{}</style><div log="SIMPLE">Simple!</div>'
         );
-        rootScope.apply();
+        _.rootScope.apply();
         // Note: There is no ordering.  It is who ever comes off the wire first!
         expect(log.result()).toEqual('LOG; SIMPLE');
       }));

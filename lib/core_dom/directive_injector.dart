@@ -168,7 +168,9 @@ class DirectiveInjector implements DirectiveBinder {
       : _parent = parent,
         _appInjector = appInjector,
         _view = view == null && parent != null ? parent._view : view,
-        _constructionDepth = NO_CONSTRUCTION;
+        _constructionDepth = NO_CONSTRUCTION {
+    _view.addInjector(this);
+  }
 
   DirectiveInjector._default(this._parent, this._appInjector)
       : _node = null,

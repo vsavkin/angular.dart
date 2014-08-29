@@ -53,6 +53,7 @@ class TestBed {
       directives = injector.getByKey(DIRECTIVE_MAP_KEY);
     }
     rootView = compiler(rootElements, directives)(scope, null, rootElements);
+    rootView.attach();
     return rootElement;
   }
 

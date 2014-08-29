@@ -207,9 +207,7 @@ class ElementBinder {
           scope.parentScope.context[(ref.annotation as Controller).publishAs] = directive;
         }
 
-        var tasks = directive is AttachAware ? new _TaskList(() {
-          if (scope.isAttached) directive.attach();
-        }) : null;
+        var tasks = directive is AttachAware ? new _TaskList(() {}) : null;
 
         if (ref.mappings.isNotEmpty) {
           if (nodeAttrs == null) nodeAttrs = new _AnchorAttrs(ref);

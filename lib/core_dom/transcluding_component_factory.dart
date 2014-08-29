@@ -47,22 +47,24 @@ class BoundTranscludingComponentFactory implements BoundComponentFactory {
       var childInjectorCompleter; // Used if the ViewFuture is available before the childInjector.
 
       var component = _component;
-      var lightDom = new LightDom(element, scope);
+      var lightDom = new LightDom(element, scope)..pullNodes();
 
       // Append the component's template as children
       var elementFuture;
 
       if (_viewFuture != null) {
         elementFuture = _viewFuture.then((ViewFactory viewFactory) {
-          lightDom.pullNodes();
-
           if (childInjector != null) {
-            lightDom.shadowDomView = viewFactory.call(childInjector.scope, childInjector);
+            final view = viewFactory.call(childInjector.scope, childInjector);
+            lightDom.shadowDomView = view;
+            view.attach();
             return element;
           } else {
             childInjectorCompleter = new async.Completer();
             return childInjectorCompleter.future.then((childInjector) {
-              lightDom.shadowDomView = viewFactory.call(childInjector.scope, childInjector);
+              final view = viewFactory.call(childInjector.scope, childInjector);
+              lightDom.shadowDomView = view;
+              view.attach();
               return element;
             });
           }

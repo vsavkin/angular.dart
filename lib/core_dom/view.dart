@@ -14,6 +14,7 @@ part of angular.core.dom_internal;
 class View {
   final Scope scope;
   final List<dom.Node> nodes;
+  final List<DirectiveInjector> _injectors = [];
   final List insertionPoints = [];
 
   View(this.nodes, this.scope);
@@ -24,6 +25,22 @@ class View {
 
   void addContent(Content content) {
     insertionPoints.add(content);
+  }
+
+  void addInjector(DirectiveInjector inj) {
+    _injectors.add(inj);
+  }
+
+  void attach() {
+    final set = new Set();
+    _injectors.forEach((inj) {
+      inj.directives.where((d) => d is AttachAware).forEach((d) {
+        if (! set.contains(d)) {
+          d.attach();
+          set.add(d);
+        }
+      });
+    });
   }
 }
 
@@ -57,6 +74,7 @@ class ViewPort {
       dom.Node previousNode = _lastNode(insertAfter);
       _viewsInsertAfter(view, insertAfter);
       _animate.insert(view.nodes, placeholder.parentNode, insertBefore: previousNode.nextNode);
+      view.attach();
       _notifyLightDom();
     });
     return view;

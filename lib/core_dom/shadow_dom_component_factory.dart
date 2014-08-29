@@ -153,7 +153,9 @@ class BoundShadowDomComponentFactory implements BoundComponentFactory {
           if (_viewFuture != null) {
             return _viewFuture.then((ViewFactory viewFactory) {
               if (shadowScope.isAttached) {
-                shadowDom.nodes.addAll(viewFactory.call(shadowInjector.scope, shadowInjector).nodes);
+                final view = viewFactory.call(shadowInjector.scope, shadowInjector);
+                shadowDom.nodes.addAll(view.nodes);
+                view.attach();
               }
               return shadowDom;
             });

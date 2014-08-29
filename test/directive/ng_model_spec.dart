@@ -47,7 +47,8 @@ void main() {
 
     beforeEach((TestBed tb) {
       _ = tb;
-      dirInjector = new DirectiveInjector(null, _.injector, null, null, null, null, null, null);
+      final view = new View([], tb.rootScope);
+      dirInjector = new DirectiveInjector(null, _.injector, null, null, null, null, null, view);
     });
 
     describe('type="text" like', () {

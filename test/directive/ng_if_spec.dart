@@ -28,7 +28,8 @@ main() {
     logger = _logger;
     compile = (html, [applyFn]) {
       element = e(html);
-      compiler([element], _directives)(scope, null, [element]);
+      final view = compiler([element], _directives)(scope, null, [element]);
+      view.attach();
       scope.apply(applyFn);
     };
     directives = _directives;

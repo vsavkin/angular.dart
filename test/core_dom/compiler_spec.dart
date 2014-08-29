@@ -282,7 +282,6 @@ void main() {
     describe('components', () {
       beforeEachModule((Module module) {
         module
-          ..bind(AttachWithAttr)
           ..bind(CamelCaseMapComponent)
           ..bind(IoComponent)
           ..bind(IoControllerComponent)
@@ -790,14 +789,12 @@ void main() {
           scope.context['isReady'] = 'ready';
           scope.context['logger'] = logger;
           scope.context['once'] = null;
-          var elts = es('<attach-detach attr-value="{{isReady}}" expr-value="isReady" once-value="once">{{logger("inner")}}</attach-detach>');
-          compile(elts, _.injector.get(DirectiveMap))(scope, null, elts);
-          expect(logger).toEqual(['new']);
-
-          expect(logger).toEqual(['new']);
+          final elt = _.compile('<attach-detach attr-value="{{isReady}}" expr-value="isReady" once-value="once">'
+              '{{logger("inner")}}</attach-detach>', scope: scope);
+          logger.clear();
 
           _.rootScope.apply();
-          var expected = ['new', 'attach:@ready; =>ready; =>!null', 'inner'];
+          var expected = ['inner'];
           assert((() {
             // there is an assertion in flush which double checks that
             // flushes do not change model. This assertion creates one
@@ -816,7 +813,7 @@ void main() {
 
           scope.destroy();
           expect(logger).toEqual(['detach']);
-          expect(elts).toHaveText('WORKED');
+          expect(elt).toHaveText('WORKED');
         }));
 
         it('should should not call attach after scope is destroyed', async((Compiler compile, Logger logger, MockHttpBackend backend) {
@@ -833,13 +830,15 @@ void main() {
           expect(logger).toEqual(['SimpleAttachComponent']);
         }));
 
-        it('should call attach after mappings have been set', async((Logger logger) {
-          _.compile('<attach-with-attr attr="a" oneway="1+1"></attach-with-attr>');
+        it('should call attach right after the view is added to a viewport',
+            async((MockHttpBackend backend, Logger logger) {
+          backend.whenGET('foo.html').respond('<div>WORKED</div>');
+          _.compile('<div ng-if="1+1"><simple-attach></simple-attach></div>');
 
           _.rootScope.apply();
           microLeap();
 
-          expect(logger).toEqual(['attr', 'oneway', 'attach']);
+          expect(logger).toEqual(['SimpleAttachComponent', 'attach']);
         }));
 
         it('should inject compenent element as the dom.Element', async((Logger log, TestBed _, MockHttpBackend backend) {
@@ -1554,19 +1553,6 @@ class SimpleAttachComponent implements AttachAware, ShadowRootAware {
   onShadowRoot(_) => logger('onShadowRoot');
 }
 
-@Decorator(
-    selector: 'attach-with-attr'
-)
-class AttachWithAttr implements AttachAware {
-  Logger logger;
-  AttachWithAttr(this.logger);
-  attach() => logger('attach');
-  @NgAttr('attr')
-  set attr(v) => logger('attr');
-  @NgOneWay('oneway')
-  set oneway(v) => logger('oneway');
-}
-
 @Component(
     selector: 'log-element',
     templateUrl: 'foo.html')
@@ -1674,7 +1660,7 @@ class OuterWithDivComponent {
 
 @Component(
     selector: 'outer',
-    template: 'OUTER(<inner><content></content></inner>)'
+    template: 'OUTER(<inner><content outer></content></inner>)'
 )
 class OuterComponent {
   final Scope scope;
@@ -1683,7 +1669,7 @@ class OuterComponent {
 
 @Component(
     selector: 'inner',
-    template: 'INNER(<innerinner><content></content></innerinner>)'
+    template: 'INNER(<innerinner><content inner></content></innerinner>)'
 )
 class InnerComponent {
   final Scope scope;

@@ -27,7 +27,9 @@ main() {
     });
 
     describe('observe/flush phase', () {
-      it('should fire only when then value has settled', async((Logger log) {
+      //TODO vsavkin enable this test once the branch implementing binding notification
+      // is ready
+      xit('should fire only when then value has settled', async((Logger log) {
         _.compile('<div dir-foo="{{val}}"></div>');
 
         _.rootScope.apply();
