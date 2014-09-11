@@ -30,8 +30,10 @@ packages:
     source: hosted
     version: "0.9.4"
   di:
-    description: di
-    source: hosted
+    description:
+      path: "override_packages/di"
+      relative: true
+    source: path
     version: "2.0.1"
   guinness:
     description: guinness
