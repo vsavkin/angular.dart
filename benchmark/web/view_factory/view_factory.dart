@@ -5,6 +5,11 @@ import 'package:angular/application_factory.dart';
 import 'package:angular/mock/module.dart';
 import 'package:benchmark_harness/benchmark_harness.dart';
 
+import 'package:angular/change_detection/ast_parser.dart';
+import 'package:angular/core/formatter.dart';
+import 'package:angular/core/module_internal.dart';
+
+
 import 'dart:html';
 import 'dart:js' as js;
 
@@ -15,25 +20,40 @@ class ViewFactoryInvocaton {
   DirectiveInjector di;
   List<Node> elements;
 
+  Injector injector;
+  DirectiveMap directiveMap;
+  Compiler compiler;
+
   ViewFactoryInvocaton(String template) {
     final m = new Module()
         ..bind(ComponentWithCss)
         ..bind(ComponentWithoutCss)
         ..bind(ComponentWithEmulatedShadowDomComponent)
-        ..bind(EmulatedShadowDomComponentWithCss);
+        ..bind(EmulatedShadowDomComponentWithCss)
+        ..bind(ScopeDigestTTL, toFactory: () => new ScopeDigestTTL.value(15), inject: [])
+        ..bind(CompilerConfig, toValue: new CompilerConfig.withOptions(elementProbeEnabled: false));
 
-    final injector = applicationFactory().addModule(m).run();
-    final directiveMap = injector.get(DirectiveMap);
-    final compiler = injector.get(Compiler);
-
-    elements = _getElements(template);
+    injector = applicationFactory().addModule(m).run();
+    directiveMap = injector.get(DirectiveMap);
+    compiler = injector.get(Compiler);
     scope = injector.get(Scope);
-    di = injector.get(DirectiveInjector);
-    viewFactory = compiler(elements, directiveMap);
+
+    di = new DirectiveInjector(null, injector, new DivElement(), null, null, scope, injector.get(Animate));
   }
 
-  run() {
-    viewFactory(scope, di, elements);
+  run(template) {
+    elements = _getElements(template);
+    viewFactory = compiler(elements, directiveMap);
+
+    final childScope = scope.createChild({});
+
+    var views = [];
+    var i = 2000;
+    while (i -- >= 0) {
+      viewFactory(scope, di);
+    }
+
+    childScope.destroy();
   }
 
   List<Node > _getElements(String template) {
@@ -53,14 +73,6 @@ final TEMPLATE_TEXT_WITH_NG_BINDING = '<span><span ng-class="{}">{{1 + 2}}</span
     '</span>';
 
 final TEMPLATE_NO_TEXT_WITH_NG_BINDING = '<span><span ng-class="{}"></span>'
-    '<span ng-if="1 != 2">left</span>'
-    '<span ng-if="1 != 2">right</span>'
-    '</span>';
-
-final TEMPLATE_TEXT_WITH_NG_BINDING_3_TIMES = '<span>'
-    '<span ng-class="{}">{{1 + 2}}</span>'
-    '<span ng-class="{}">{{1 + 2}}</span>'
-    '<span ng-class="{}">{{1 + 2}}</span>'
     '<span ng-if="1 != 2">left</span>'
     '<span ng-if="1 != 2">right</span>'
     '</span>';
@@ -110,7 +122,6 @@ class ComponentWithEmulatedShadowDomComponent {
 
 void main() {
   final templates = {
-      "(text + ng-binding) * 3" : TEMPLATE_TEXT_WITH_NG_BINDING_3_TIMES,
       "text" : TEMPLATE_TEXT_NO_NG_BINDING,
       "text + ng-binding" : TEMPLATE_TEXT_WITH_NG_BINDING,
       "ng-binding" : TEMPLATE_NO_TEXT_WITH_NG_BINDING,
@@ -124,10 +135,9 @@ void main() {
     t.appendHtml("<option value='$name'>$name</option>");
   });
 
+  final b = new ViewFactoryInvocaton(templates[t.value]);
   viewFactory(_) {
-    final b = new ViewFactoryInvocaton(templates[t.value]);
-    int i = 5000;
-    while (i -- > 0) b.run();
+    b.run(templates[t.value]);
   }
 
   js.context['benchmarkSteps'].add(new js.JsObject.jsify({
