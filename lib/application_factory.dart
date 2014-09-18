@@ -60,6 +60,13 @@ import 'dart:mirrors' show MirrorsUsed;
 
 class _DynamicApplication extends Application {
   _DynamicApplication() {
+    assert(() {
+      // Do not add types multiple times in test where multiple applications are created
+      for (var type in [Component, Decorator, Formatter]) {
+        if (!Module.classAnnotations.contains(type)) Module.classAnnotations.add(type);
+      }
+      return true;
+    });
     ngModule
         ..bind(TypeToUriMapper, toImplementation: DynamicTypeToUriMapper)
         ..bind(MetadataExtractor, toImplementation: DynamicMetadataExtractor)

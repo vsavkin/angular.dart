@@ -214,6 +214,7 @@ _removeNgBinding(node) {
 }
 
 main() {
+  Module.classAnnotations.addAll([Decorator, Component, Formatter]);
   gns.beforeEach(setUpInjector, priority:3);
   gns.afterEach(tearDownInjector);
 
