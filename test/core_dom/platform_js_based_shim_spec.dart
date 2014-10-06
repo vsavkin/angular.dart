@@ -21,7 +21,7 @@ main() {
 
       // TODO(vicb) WebPlatform does not work with polyfills
       // see https://github.com/angular/angular.dart/issues/1300
-      if (platform.shimRequired) return;
+//      if (platform.shimRequired) return;
 
       Element element = e('<span><test-wptc><span>ignore</span></test-wptc></span>');
 
@@ -59,7 +59,7 @@ main() {
 
       // TODO(vicb) WebPlatform does not work with polyfills
       // see https://github.com/angular/angular.dart/issues/1300
-      if (platform.shimRequired) return;
+//      if (platform.shimRequired) return;
 
       Element element = e('<span><test-wptc><span>ignore</span></test-wptc></span>');
 
