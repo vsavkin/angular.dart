@@ -6,7 +6,7 @@ import 'package:angular/angular.dart';
 import 'package:angular/application_factory.dart';
 import 'package:angular/playback/playback_http.dart';
 
-import 'package:quiver/collection.dart';
+//import 'package:quiver/collection.dart';
 
 class Item {
   String text;
