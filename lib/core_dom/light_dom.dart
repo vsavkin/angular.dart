@@ -29,9 +29,6 @@ class LightDom implements SourceLightDom, DestinationLightDom {
   void clearComponentElement() {
     // This is needed because _lightDomRootNodes can contains viewports,
     // which cannot be detached.
-    final fakeRoot = new dom.DivElement();
-    fakeRoot.nodes.addAll(_lightDomRootNodes);
-
     _componentElement.nodes = [];
   }
 

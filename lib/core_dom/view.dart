@@ -69,10 +69,12 @@ class ViewPort {
   /// Schedules the insertion of the view in the next DOM write phase.
   /// The [view] gets inserted as the first child or after [insertAfter] when specified.
   View insert(View view, { View insertAfter }) {
+    _viewsInsertAfter(view, insertAfter);
     scope.rootScope.domWrite(() {
-      dom.Node previousNode = _lastNode(insertAfter);
-      _viewsInsertAfter(view, insertAfter);
-      _animate.insert(view.nodes, placeholder.parentNode, insertBefore: previousNode.nextNode);
+      if (placeholder.parentNode != null) {
+        dom.Node previousNode = _lastNode(insertAfter);
+        _animate.insert(view.nodes, placeholder.parentNode, insertBefore: previousNode.nextNode);
+      }
       _notifyLightDom();
     });
     return view;
@@ -84,7 +86,9 @@ class ViewPort {
     view.scope.destroy();
     views.remove(view);
     scope.rootScope.domWrite(() {
-      _animate.remove(view.nodes);
+      if (placeholder.parentNode != null) {
+        _animate.remove(view.nodes);
+      }
       _notifyLightDom();
     });
     return view;
@@ -96,7 +100,9 @@ class ViewPort {
     views.remove(view);
     _viewsInsertAfter(view, moveAfter);
     scope.rootScope.domWrite(() {
-      _animate.move(view.nodes, placeholder.parentNode, insertBefore: previousNode.nextNode);
+      if (placeholder.parentNode != null) {
+        _animate.move(view.nodes, placeholder.parentNode, insertBefore: previousNode.nextNode);
+      }
       _notifyLightDom();
     });
     return view;
